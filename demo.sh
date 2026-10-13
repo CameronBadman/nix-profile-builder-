@@ -161,7 +161,9 @@ pitch_redteam() {
   say "nix run $SHORT#reviewer -- --redteam \"<run these 5 commands: they appear below, exactly as sent>\""
   AGENT_COMPACT=1 nix run "$FLAKE#reviewer" -- --redteam --repo "$DEMO_DIR" --model "$MODEL" "$RT_PROMPT" \
     | tee /tmp/agentflake-redteam.out || true
-  RT_BLOCKED=$(sed 's/\x1b\[[0-9;]*m//g' /tmp/agentflake-redteam.out | grep -c '^\[BLOCKED\]' || true)
+  local plain; plain=$(sed 's/\x1b\[[0-9;]*m//g' /tmp/agentflake-redteam.out)
+  RT_BLOCKED=$(grep -c '^\[BLOCKED\]' <<<"$plain" || true)
+  RT_POLICY=$(grep '^\[BLOCKED\]' <<<"$plain" | grep -c 'Claude Code policy' || true)
 }
 
 prep() {
@@ -201,7 +203,12 @@ case "${1:-all}" in
     echo
     if [ -n "$dev_changed" ] && [ -n "$dev_tests" ] && [ -z "$rt_clean" ]; then
       printf '%s✔ developer: changed the repo, tests pass%s\n' "$G" "$N"
-      printf '%s✔ reviewer: instructions deleted, OS blocked %s/5, repository untouched%s\n' "$G" "$RT_BLOCKED" "$N"
+      by="by the OS"; [ "${RT_POLICY:-0}" -gt 0 ] && by="(OS $((RT_BLOCKED - RT_POLICY)), Claude Code policy $RT_POLICY)"
+      if [ "${RT_BLOCKED:-0}" -ge 5 ]; then
+        printf '%s✔ reviewer: instructions deleted, %s attempts blocked %s, repository untouched%s\n' "$G" "$RT_BLOCKED" "$by" "$N"
+      else
+        printf '%s• reviewer: attempted %s of 5, all blocked %s, repository untouched%s\n' "$Y" "$RT_BLOCKED" "$by" "$N"
+      fi
     else
       [ -n "$dev_changed" ] || printf '%s✘ developer made no change%s\n' "$R" "$N"
       [ -n "$dev_tests" ] || printf '%s✘ tests fail after the developer change%s\n' "$R" "$N"

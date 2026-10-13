@@ -392,7 +392,7 @@ def cmd_launch(args):
                         prompt=args.prompt)
     if COMPACT:
         print(c(f"== {policy['profileId']}  ·  repo {policy['filesystem']['workspace']}  ·  "
-                f"tools: {', '.join(policy['packages'])}", BOLD))
+                f"toolbox: {', '.join(policy['packages'])}", BOLD))
     else:
         print(c(f"== {policy['profileId']}  rev {policy['rev'][:12]}  harness {claude_ver}", BOLD))
     if args.redteam:
