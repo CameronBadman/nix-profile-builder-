@@ -241,6 +241,7 @@ def summarize(inp):
 class Audit:
     def __init__(self, policy, run_id, redteam=False):
         self.redteam = redteam
+        self.hidden = 0
         (STATE / "logs").mkdir(parents=True, exist_ok=True)
         self.path = STATE / "logs" / f"{run_id}-{policy['name']}.jsonl"
         self.f = self.path.open("a")
@@ -323,7 +324,7 @@ class Audit:
                 label = {"allowed": c("ALLOWED", GREEN), "blocked": c("BLOCKED", RED),
                          "error": c("error", YELLOW)}[kind]
                 if COMPACT and kind == "allowed" and req.get("name") in ("Read", "Grep", "Glob", "Skill", "TodoWrite"):
-                    pass  # read-only noise; still counted and logged
+                    self.hidden += 1  # read-only noise; still counted and logged
                 elif COMPACT:
                     lines = [l for l in text.strip().splitlines() if l.strip()] or [""]
                     hit = [l for l in lines if any(k in l.lower() for k in BLOCK_MARKERS)]
@@ -403,8 +404,13 @@ def cmd_launch(args):
         audit.write("stderr", text=err[-2000:])
         print(f"[stderr] {err[-800:]}", file=sys.stderr)
     audit.write("run_end", exit_code=rc, **audit.counts)
-    print(c(f"== done: exit={rc} ", BOLD) + c(f"allowed={audit.counts['allowed']} ", GREEN)
-          + c(f"blocked={audit.counts['blocked']} ", RED) + f"errors={audit.counts['error']}  profile={start['profile']}")
+    if COMPACT:
+        hidden = f" ({audit.hidden} reads not shown)" if audit.hidden else ""
+        print(c("== done: ", BOLD) + c(f"allowed={audit.counts['allowed']}{hidden}  ", GREEN)
+              + c(f"blocked={audit.counts['blocked']}", RED))
+    else:
+        print(c(f"== done: exit={rc} ", BOLD) + c(f"allowed={audit.counts['allowed']} ", GREEN)
+              + c(f"blocked={audit.counts['blocked']} ", RED) + f"errors={audit.counts['error']}  profile={start['profile']}")
     return rc
 
 

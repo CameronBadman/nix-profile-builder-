@@ -41,7 +41,7 @@
   .term .cmd::before { content: "$ "; color: var(--faint); }
   .term .mute { color: var(--faint); }
   .term .bold { font-weight: 800; }
-  .term.rec { font-size: clamp(11px, 1.25vw, 18px); }
+  .term.rec { font-size: clamp(11px, 1.25vw, 18px); white-space: pre-wrap; }
   .cols { display: grid; grid-template-columns: 1.35fr 1fr; gap: 3vw; align-items: center; }
   .stack { display: grid; gap: 2.6vh; }
   .stack p b { font-weight: 800; }
@@ -49,14 +49,14 @@
     border-radius: 12px; padding: 1.6vh 1.6vw; display: flex; flex-wrap: wrap; gap: .4em 1.6em; align-items: center; }
   .cue { font: 700 clamp(15px, 1.8vw, 26px) var(--mono); color: var(--yellow); }
   .close { display: grid; grid-template-columns: 1fr auto; gap: 3vw; align-items: center; }
-  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 2vw; }
+  .stats { display: grid; grid-template-columns: 1fr; gap: 2vw; }
   .stat { border-left: 5px solid var(--green); padding-left: 1.2vw; }
   .stat .num { font: 800 clamp(34px, 5vw, 76px) var(--sans); letter-spacing: -.03em; line-height: 1.05; }
   .stat .lbl { font-size: clamp(15px, 1.7vw, 24px); color: var(--dim); }
   .qr { width: clamp(120px, 15vw, 230px); aspect-ratio: 1; background: #fff; border-radius: 14px; padding: 10px; }
   .ask { font-size: clamp(20px, 2.5vw, 36px); color: var(--yellow); font-weight: 700; }
   .try { font: 700 clamp(13px, 1.5vw, 22px) var(--mono); background: var(--panel); border: 1px solid var(--line);
-    border-radius: 12px; padding: 1.6vh 1.4vw; overflow-x: auto; white-space: nowrap; }
+    border-radius: 12px; padding: 1.6vh 1.4vw; overflow-wrap: anywhere; }
   .try .h { color: var(--green); }
   table { border-collapse: collapse; width: 100%; font-size: clamp(16px, 2vw, 28px); }
   td { padding: 1.4vh 1vw; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -91,7 +91,8 @@
     <div class="term code"><span class="mute"># profiles/reviewer.nix (abridged)</span>
 name = <span class="g">"reviewer"</span>;
 version = <span class="g">"1.1.0"</span>;
-packages = [ <span class="g">"git" "ripgrep" "shellcheck"</span> ];
+packages = [ <span class="g">"ripgrep" "git" "shellcheck"</span> ];
+tools = [ <span class="g">"Read" "Grep" "Glob" "Bash" "Skill" "Agent"</span> ];
 filesystem.workspace = <span class="g">"read-only"</span>;
 network.tools = <span class="g">"deny"</span>;   <span class="mute"># web tools off</span>
 skills = [ <span class="g">"acme-code-review"</span> ];
@@ -108,12 +109,11 @@ behaviour.standards = [ <span class="g">"review"</span> ];</div>
 
 <section class="slide" data-tag="">
   <div class="brand">agentflake</div>
-  <h2>AI agents, versioned like code.</h2>
+  <h2>Defined once. Locked by the OS.<br>Versioned like code.</h2>
   <div class="close">
     <div class="stack">
       <div class="stats">
         <div class="stat"><div class="num g">0</div><div class="lbl">writes got through<br>(24 blocked actions, 10 red-team runs)</div></div>
-        <div class="stat"><div class="num">&lt; 1¢</div><div class="lbl">per agent run (Claude Haiku)</div></div>
       </div>
       <div class="try"><span class="dim">try it → </span>nix run <span class="h">github:CameronBadman/nix-profile-builder-#agentctl</span> -- list</div>
       <p class="ask"><b>Ask:</b> platform teams, pilot it on one repo this week.</p>

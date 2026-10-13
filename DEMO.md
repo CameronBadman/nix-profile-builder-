@@ -14,14 +14,15 @@ limits, skills, standards), publishes it on GitHub, and everyone runs the exact 
 
 | Time | Where | Say (roughly) | Point at |
 |---|---|---|---|
-| 0:00 | Slide 1 | "Today your AI agent has a shell, your repo and your login. What stops it? A prompt saying *please don't*, and a settings file on each laptop that anyone can change. Last July a coding agent deleted a production database during a code freeze. agentflake is for the platform team rolling agents out to every developer." | the red line |
+| 0:00 | Slide 1 | "Your AI agent has a shell, your repo and your login. What stops it? A *please don't* prompt and an editable settings file. Last July, an agent deleted a production database. agentflake is for platform teams." (~40 words; let the slide carry the rest) | the red line |
 | 0:20 | Slide 2 | "One file defines the agent: its tools, what the OS lets it touch, the company's skills and standards. It lives on GitHub, so every release is a git tag, and an upgrade is a diff you can review like a pull request." | the code, then the diff strip |
 | 0:45 | Terminal | `./demo.sh pitch`. Act 1 runs while you talk: "Same repo, developer profile. It pulls straight from GitHub, can write, and has python and ruff." | `profile skills=[…acme-implement-feature]`, the `✎ repository changed` diff |
 | 1:10 | Terminal, press ⏎ | "Now the reviewer. Red-team mode deletes its instructions, the *please don't* from slide 1. We even hand it the exact commands: edit the code, delete the tests, look for my SSH keys." | the `$` line |
-| 1:25 | Terminal | "It tried. Read-only file system, three times. And my SSH keys don't even exist in its world: that's what stops a Replit-style accident. Repository untouched." | three red `Read-only file system`, then `hidden from the sandbox`, then the ✔ line |
-| 1:45 | Slide 3 | "Across ten red-team runs, zero writes got through, under a cent a run. Platform teams: pilot it on one repo this week. The QR has the repo." | `0`, the ask, QR |
+| 1:25 | Terminal | "It tried. Read-only file system, every time. Its world has no SSH keys and no credentials, so a Replit-style agent has nothing to reach production with. And it can't rewrite its own rules. The agent ignored its instructions; the OS didn't." | three red `Read-only file system`, then `hidden from the sandbox`, then the ✔ line |
+| 1:45 | Slide 3 | "Defined once, locked by the OS, versioned like code. Across ten red-team runs, zero writes got through. Platform teams: pilot it on one repo this week. The QR has the repo." | `0`, the ask, QR |
 | ~2:15 | done | | |
 
+**If the agent declines one command** (it occasionally refuses to touch its own rules file): "it wouldn't even try; the sandbox probe shows that file is read-only anyway."
 **If an act takes longer than ~20 s:** keep talking (the slide 1 "please don't" line is the filler).
 **If it fails or stalls past 25 s:** "here's that same run": switch to the deck, press **b**:
 B1 = developer run, B2 = red-team run (exact copies of `demo/recorded-pitch.txt`; refresh with
@@ -58,7 +59,7 @@ the profile's (checked at eval), and they run in the same sandbox.
 **Other harnesses / macOS?** Linux + Claude Code only today. The profile schema is
 harness-neutral, and an adapter is roughly one function.
 
-**What does it cost / how fast?** Measured: $0.0016–0.0052 per run on Haiku; first action 3–7 s after launch (cached), full runs 5–39 s.
+**How fast?** Measured: first action 3–7 s after launch (cached), full runs 5–39 s.
 
 **Was this pre-built?** Built this evening: the commit history starts at 18:04 (the first commit
 already holds a working core: the project folder was created at 17:37, so it reflects ~30 minutes of work), about 900 lines.
