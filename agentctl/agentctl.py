@@ -23,11 +23,14 @@ CONFIG_DIR = f"{SANDBOX_HOME}/.claude-profile"
 SCRATCH = f"{SANDBOX_HOME}/scratch"
 CLAUDE_IN_SANDBOX = "/opt/claude/bin/claude"
 MANAGED = "/etc/claude-code/managed-settings.json"
+import re
+STORE_PATH = re.compile(r"/nix/store/[a-z0-9]{32}-[^/\s]+/bin/")
 RESULT_BLOCK_MARKERS = ("read-only file system", "deny network-outbound", "operation not permitted")
 BLOCK_MARKERS = ("read-only file system", "permission denied", "not permitted",
                  "denied", "eacces", "erofs", "not allowed", "outside the allowed")
 
 
+COMPACT = bool(os.environ.get("AGENT_COMPACT"))  # one short line per action, for live demos
 COLOR = sys.stdout.isatty() or bool(os.environ.get("FORCE_COLOR"))
 
 
@@ -223,6 +226,17 @@ def guidance_flags(args, bundle):
             "--plugin-dir", str(bundle / "plugin")]
 
 
+def summarize(inp):
+    """Short human label for a tool input: file name or the command."""
+    inp = inp or {}
+    if "command" in inp:
+        return STORE_PATH.sub("", inp["command"])[:70]
+    for k in ("file_path", "path", "pattern", "skill"):
+        if k in inp:
+            return os.path.basename(str(inp[k])) if k == "file_path" else str(inp[k])[:60]
+    return ""
+
+
 class Audit:
     def __init__(self, policy, run_id):
         (STATE / "logs").mkdir(parents=True, exist_ok=True)
@@ -239,6 +253,7 @@ class Audit:
 
     def say(self, msg, width=160):
         # one line per event; agent prose is printed in full
+        msg = STORE_PATH.sub("", msg)  # /nix/store/<hash>-agent-x-env/bin/bash: -> bash:
         if not msg.startswith(c("[agent]", BOLD)):
             msg = " ⏎ ".join(l.strip() for l in msg.splitlines() if l.strip())
             msg = msg if len(msg) <= width else msg[:width] + "…"
@@ -250,14 +265,15 @@ class Audit:
             rec = {k: m.get(k) for k in ("tools", "skills", "slash_commands", "agents", "model",
                                          "permissionMode", "cwd") if k in m}
             self.write("harness_init", **rec)
-            self.say(f"[init] model={m.get('model')} permissionMode={m.get('permissionMode')}")
-            self.say(f"[init] tools={m.get('tools')}")
+            if not COMPACT:
+                self.say(f"[init] model={m.get('model')} permissionMode={m.get('permissionMode')}")
+                self.say(f"[init] tools={m.get('tools')}")
             if "skills" in m:
                 mine = [s for s in m["skills"] if s.startswith("profile-")]
                 self.say(f"[init] profile skills={c(mine, GREEN)} (+{len(m['skills']) - len(mine)} built-in)")
             if m.get("plugin_errors"):
                 self.say(f"[init] PLUGIN ERRORS {m['plugin_errors']}")
-            if "agents" in m:
+            if "agents" in m and not COMPACT:
                 self.say(f"[init] agents={m.get('agents')}")
         elif t == "system" and m.get("subtype") == "permission_denied":
             self.counts["blocked"] += 1
@@ -269,7 +285,8 @@ class Audit:
                     self.pending[b["id"]] = b
                     self.write("tool_request", tool=b["name"], input=b.get("input"),
                                subagent=m.get("parent_tool_use_id"))
-                    self.say(c(f"[tool] {b['name']} {json.dumps(b.get('input'))[:160]}", CYAN))
+                    if not COMPACT:
+                        self.say(c(f"[tool] {b['name']} {json.dumps(b.get('input'))[:160]}", CYAN))
                 elif b.get("type") == "text" and b.get("text", "").strip():
                     self.say(f"{c('[agent]', BOLD)} {b['text'].strip()}")
         elif t == "user":
@@ -290,14 +307,22 @@ class Audit:
                 self.write(kind, tool=req.get("name"), input=req.get("input"), result=text[:500])
                 label = {"allowed": c("ALLOWED", GREEN), "blocked": c("BLOCKED", RED),
                          "error": c("error", YELLOW)}[kind]
-                self.say(f"[{label}] {req.get('name')}: {text.strip()[:200]}")
+                if COMPACT:
+                    lines = [l for l in text.strip().splitlines() if l.strip()] or [""]
+                    hit = [l for l in lines if any(k in l.lower() for k in BLOCK_MARKERS)]
+                    detail = (hit or lines)[-1].rsplit(": ", 1)[-1]  # "...: Read-only file system" -> reason
+                    self.say(f"[{label}] {req.get('name'):<5} {summarize(req.get('input'))}"
+                             + (f"  →  {c(detail[-60:], RED)}" if kind == "blocked" else ""))
+                else:
+                    self.say(f"[{label}] {req.get('name')}: {text.strip()[:200]}")
         elif t == "result":
             self.write("result", permission_denials=m.get("permission_denials"),
                        cost_usd=m.get("total_cost_usd"), is_error=m.get("is_error"),
                        num_turns=m.get("num_turns"), result=m.get("result"))
             for d in m.get("permission_denials") or []:
                 self.say(f"[denial] {json.dumps(d)[:200]}")
-            self.say(f"[result] cost=${m.get('total_cost_usd')} turns={m.get('num_turns')}")
+            if not COMPACT:
+                self.say(f"[result] cost=${m.get('total_cost_usd')} turns={m.get('num_turns')}")
 
 
 def cmd_launch(args):
@@ -336,10 +361,15 @@ def cmd_launch(args):
                         workspace_mode=policy["filesystem"]["workspace"], model=args.model,
                         redteam=args.redteam,
                         prompt=args.prompt)
-    print(c(f"== {policy['profileId']}  rev {policy['rev'][:12]}  harness {claude_ver}", BOLD))
+    if COMPACT:
+        print(c(f"== {policy['profileId']}  ·  repo {policy['filesystem']['workspace']}  ·  "
+                f"tools: {', '.join(policy['packages'])}", BOLD))
+    else:
+        print(c(f"== {policy['profileId']}  rev {policy['rev'][:12]}  harness {claude_ver}", BOLD))
     if args.redteam:
         print(c("== REDTEAM: behaviour guidance + skills dropped; enforcement unchanged", YELLOW))
-    print(f"== workspace {repo} ({policy['filesystem']['workspace']})  log {audit.path}")
+    if not COMPACT:
+        print(f"== workspace {repo} ({policy['filesystem']['workspace']})  log {audit.path}")
     proc = subprocess.Popen(argv + ["--"] + claude, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     for line in proc.stdout:
         line = line.strip()

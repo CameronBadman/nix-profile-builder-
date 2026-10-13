@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agents, versioned like code</title>
+<title>agentflake</title>
 <style>
   :root {
-    --bg: #0d1117; --panel: #161b22; --line: #30363d; --fg: #e6edf3; --dim: #8b949e;
-    --green: #3fb950; --red: #f85149; --yellow: #d29922; --blue: #58a6ff; --violet: #bc8cff;
+    --bg: #0b0f14; --panel: #151b23; --line: #2d333b; --fg: #f0f3f6; --dim: #b7c0ca; --faint: #8b949e;
+    --green: #4ade80; --red: #ff6b6b; --yellow: #fbbf24; --blue: #7cc4ff; --violet: #c4a7ff;
     --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
     --sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   }
@@ -15,274 +15,633 @@
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font-family: var(--sans); }
   body { overflow: hidden; }
   .slide {
-    position: absolute; inset: 0; padding: 6vh 7vw 9vh; display: flex; flex-direction: column;
-    justify-content: center; gap: 2.4vh; opacity: 0; pointer-events: none; transform: translateX(3vw);
-    transition: opacity .35s ease, transform .35s ease;
+    position: absolute; inset: 0; padding: 7vh 8vw 8vh; display: flex; flex-direction: column;
+    justify-content: center; gap: 3.2vh; opacity: 0; pointer-events: none; transform: translateX(3vw);
+    transition: opacity .3s ease, transform .3s ease;
   }
   .slide.active { opacity: 1; pointer-events: auto; transform: none; }
   .slide.past { transform: translateX(-3vw); }
-  .kicker { font: 600 clamp(12px, 1.4vw, 18px) var(--mono); color: var(--green); letter-spacing: .08em; text-transform: uppercase; }
-  h1 { font-size: clamp(36px, 6.4vw, 92px); line-height: 1.02; margin: 0; letter-spacing: -.03em; }
-  h2 { font-size: clamp(28px, 4.2vw, 60px); line-height: 1.08; margin: 0; letter-spacing: -.02em; }
-  p, li { font-size: clamp(16px, 2vw, 28px); line-height: 1.45; color: var(--fg); margin: 0; }
+  .kicker { font: 700 clamp(14px, 1.6vw, 22px) var(--mono); color: var(--green); letter-spacing: .08em; text-transform: uppercase; }
+  .backup .kicker { color: var(--faint); }
+  h1 { font-size: clamp(44px, 8vw, 120px); line-height: 1; margin: 0; letter-spacing: -.035em; }
+  h2 { font-size: clamp(30px, 4.6vw, 66px); line-height: 1.08; margin: 0; letter-spacing: -.025em; }
+  p { font-size: clamp(18px, 2.4vw, 34px); line-height: 1.4; margin: 0; }
+  .small { font-size: clamp(15px, 1.7vw, 24px); }
   .dim { color: var(--dim); }
   .g { color: var(--green); } .r { color: var(--red); } .y { color: var(--yellow); } .b { color: var(--blue); } .v { color: var(--violet); }
-  ul { margin: 0; padding-left: 1.2em; display: grid; gap: 1.2vh; }
+  .brand { font: 800 clamp(22px, 2.8vw, 40px) var(--mono); color: var(--green); letter-spacing: -.02em; }
+  .stakes { font-size: clamp(22px, 3vw, 44px); font-weight: 700; line-height: 1.25; max-width: 30ch; }
   .term {
-    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 2.2vh 2vw;
-    font: clamp(12px, 1.35vw, 19px)/1.55 var(--mono); white-space: pre; overflow-x: auto; max-width: 100%;
-    box-shadow: 0 20px 60px rgba(0,0,0,.35);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 2.4vh 2vw;
+    font: clamp(13px, 1.6vw, 23px)/1.6 var(--mono); white-space: pre; overflow-x: auto; max-width: 100%;
   }
   .term .cmd { color: var(--yellow); }
-  .term .cmd::before { content: "$ "; color: var(--dim); }
-  .big-cmd { font: 600 clamp(16px, 2.3vw, 34px) var(--mono); color: var(--fg); background: var(--panel);
-    border: 1px solid var(--line); border-radius: 12px; padding: 2vh 2vw; overflow-x: auto; white-space: nowrap; }
-  .big-cmd .h { color: var(--green); }
-  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 3vw; align-items: start; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 2.4vh 1.8vw; display: grid; gap: 1.2vh; }
-  .card h3 { margin: 0; font-size: clamp(18px, 2.2vw, 30px); }
-  .pill { display: inline-block; font: 600 clamp(11px, 1.1vw, 15px) var(--mono); padding: .25em .7em; border-radius: 999px; border: 1px solid currentColor; }
-  table { border-collapse: collapse; width: 100%; font-size: clamp(14px, 1.7vw, 24px); }
-  td, th { text-align: left; padding: 1.1vh 1vw; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { color: var(--dim); font-weight: 600; font-size: .8em; text-transform: uppercase; letter-spacing: .06em; }
-  .wow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2vw; }
-  .wow .n { font: 700 clamp(28px, 4vw, 56px) var(--mono); color: var(--green); }
-  svg { width: 100%; height: auto; max-height: 58vh; }
-  svg text { font-family: var(--mono); fill: var(--fg); }
-  .footer { position: fixed; left: 7vw; right: 7vw; bottom: 3vh; display: flex; justify-content: space-between;
-    font: clamp(11px, 1vw, 14px) var(--mono); color: var(--dim); z-index: 2; }
-  .progress { position: fixed; left: 0; top: 0; height: 3px; background: var(--green); transition: width .35s ease; z-index: 3; }
-  .hint { opacity: .7; }
+  .term .cmd::before { content: "$ "; color: var(--faint); }
+  .term .mute { color: var(--faint); }
+  .cols { display: grid; grid-template-columns: 1.35fr 1fr; gap: 3vw; align-items: center; }
+  .stack { display: grid; gap: 2.6vh; }
+  .stack p b { font-weight: 800; }
+  .strip { font: 600 clamp(14px, 1.7vw, 24px) var(--mono); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 1.6vh 1.6vw; display: flex; flex-wrap: wrap; gap: .4em 1.6em; align-items: center; }
+  .cue { font: 700 clamp(15px, 1.8vw, 26px) var(--mono); color: var(--yellow); }
+  .close { display: grid; grid-template-columns: 1fr auto; gap: 3vw; align-items: center; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 2vw; }
+  .stat { border-left: 5px solid var(--green); padding-left: 1.2vw; }
+  .stat .num { font: 800 clamp(34px, 5vw, 76px) var(--sans); letter-spacing: -.03em; line-height: 1.05; }
+  .stat .lbl { font-size: clamp(15px, 1.7vw, 24px); color: var(--dim); }
+  .qr { width: clamp(120px, 15vw, 230px); aspect-ratio: 1; background: #fff; border-radius: 14px; padding: 10px; }
+  .try { font: 700 clamp(13px, 1.5vw, 22px) var(--mono); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 1.6vh 1.4vw; overflow-x: auto; white-space: nowrap; }
+  .try .h { color: var(--green); }
+  table { border-collapse: collapse; width: 100%; font-size: clamp(16px, 2vw, 28px); }
+  td { padding: 1.4vh 1vw; border-bottom: 1px solid var(--line); vertical-align: top; }
+  svg.diagram { width: 100%; height: auto; max-height: 56vh; }
+  svg.diagram text:not([fill]) { fill: var(--fg); }
+  svg.diagram text { font-family: var(--sans); }
+  .tag { position: fixed; right: 2.4vw; bottom: 2.4vh; font: 700 clamp(12px, 1.1vw, 16px) var(--mono); color: var(--faint); z-index: 2; }
+  .progress { position: fixed; left: 0; top: 0; height: 4px; background: var(--green); transition: width .3s ease; z-index: 3; }
   @media (max-width: 760px) {
-    .cols, .wow { grid-template-columns: 1fr; }
-    .slide { padding: 5vh 16px 10vh; justify-content: flex-start; overflow-y: auto; }
-    .footer { left: 16px; right: 16px; }
+    .cols, .stats, .close { grid-template-columns: 1fr; }
+    .slide { padding: 5vh 16px 9vh; justify-content: flex-start; overflow-y: auto; }
   }
 </style>
 </head>
 <body>
 <div class="progress" id="progress"></div>
 
-<!-- 1 -->
-<section class="slide">
-  <div class="kicker">Hackday · ACME agent profiles</div>
-  <h1>Agents,<br>versioned like code.</h1>
-  <p class="dim">A company defines an agent once (tools, permissions, skills, standards), publishes it to GitHub, and anyone launches the exact same agent with one command.</p>
-  <div class="big-cmd"><span class="dim">$ </span>nix run <span class="h">github:CameronBadman/nix-profile-builder-#reviewer</span></div>
+<!-- ===== MAIN: 3 slides + ~1 min live demo = 2-3 minutes ===== -->
+
+<section class="slide" data-tag="">
+  <div class="brand">agentflake</div>
+  <h1>AI agents,<br>versioned like code.</h1>
+  <p class="stakes">Today your AI agent has a shell, your repo and your login. <span class="r">The only thing stopping it is a prompt that says "please don't".</span></p>
+  <p class="small dim">July 2025: an AI coding agent deleted a company's production database during a code freeze. (Replit / SaaStr)</p>
+  <p class="small dim">For platform teams rolling AI agents out to every developer.</p>
 </section>
 
-<!-- 2 -->
-<section class="slide">
-  <div class="kicker">The problem</div>
-  <h2>Every developer's agent is a snowflake.</h2>
-  <ul>
-    <li>Different tool versions, different MCPs, different <span class="y">CLAUDE.md</span> files on every laptop.</li>
-    <li>Permissions are "whatever I clicked yes to last week".</li>
-    <li>Company review & coding standards live in a wiki the agent never reads.</li>
-    <li>When something goes wrong: <span class="r">no idea which setup the agent was running.</span></li>
-  </ul>
-</section>
-
-<!-- 3 -->
-<section class="slide">
+<section class="slide" data-tag="">
   <div class="kicker">The idea</div>
-  <h2>One name = the whole setup.</h2>
+  <h2>One file defines the agent. Git versions it.</h2>
   <div class="cols">
-    <div class="term"><span class="dim"># profiles/reviewer.nix</span>
-{
-  name    = <span class="g">"reviewer"</span>;
-  version = <span class="g">"1.1.0"</span>;
-  packages = [ <span class="g">"ripgrep" "git" "shellcheck"</span> ];
-  filesystem.workspace = <span class="g">"read-only"</span>;
-  network.tools        = <span class="g">"deny"</span>;
-  tools  = [ <span class="g">"Read" "Grep" "Glob"</span>
-             <span class="g">"Bash" "Skill" "Agent"</span> ];
-  skills = [ <span class="g">"acme-code-review"</span> ];
-  behaviour.standards = [ <span class="g">"review"</span> ];
-  subagents.security-auditor = { <span class="dim">…</span> };
-}</div>
-    <div class="card">
-      <h3>What you get</h3>
-      <p><span class="b">Tools</span> pinned by Nix: every agent gets exactly its toolbox.</p>
-      <p><span class="r">Permissions</span> enforced by the kernel sandbox + harness.</p>
-      <p><span class="v">Skills & standards</span> loaded as agent instructions.</p>
-      <p><span class="g">Versions</span> = git tags. Distribution = GitHub. No server.</p>
+    <div class="term"><span class="mute"># profiles/reviewer.nix (abridged)</span>
+name                 = <span class="g">"reviewer"</span>;
+version              = <span class="g">"1.1.0"</span>;
+packages             = [ <span class="g">"git" "ripgrep" "shellcheck"</span> ];
+filesystem.workspace = <span class="g">"read-only"</span>;
+network.tools        = <span class="g">"deny"</span>;  <span class="mute"># web tools off</span>
+skills               = [ <span class="g">"acme-code-review"</span> ];
+behaviour.standards  = [ <span class="g">"review"</span> ];</div>
+    <div class="stack">
+      <p><b class="r">Locked by the OS:</b> <span class="dim">repo, home folder and its own rules</span></p>
+      <p><b class="v">Company skills</b> <span class="dim">and standards built in</span></p>
+      <p><b class="g">Versioned by git:</b> <span class="dim">every release is a tag you can diff</span></p>
     </div>
   </div>
+  <div class="strip"><span class="dim">agentctl diff</span> <span><span class="r">v1.0.0</span> → <span class="g">v1.1.0</span></span> <span class="g">+shellcheck</span> <span class="g">+ security findings must cite a CWE id</span></div>
+  <div class="cue">Live → swap the agent, then tell it to break the rules</div>
 </section>
 
-<!-- 4 -->
-<section class="slide">
-  <div class="kicker">How it works</div>
-  <h2>A launch, end to end.</h2>
-  <svg viewBox="0 0 1200 430" role="img" aria-label="Architecture: GitHub flake builds a read-only Nix store bundle; agentctl launches Claude Code inside a bubblewrap sandbox and writes the audit log from outside">
-    <defs>
-      <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/></marker>
-    </defs>
-    <!-- github -->
-    <rect x="20" y="40" width="250" height="110" rx="12" fill="#161b22" stroke="#30363d"/>
-    <text x="40" y="80" font-size="20" font-weight="700">GitHub flake</text>
-    <text x="40" y="108" font-size="15" fill="#8b949e">profiles/*.nix · skills/</text>
-    <text x="40" y="130" font-size="15" fill="#8b949e">tags v1.0.0, v1.1.0</text>
-    <!-- store -->
-    <rect x="20" y="230" width="250" height="160" rx="12" fill="#161b22" stroke="#3fb950"/>
-    <text x="40" y="268" font-size="20" font-weight="700" fill="#3fb950">/nix/store bundle</text>
-    <text x="40" y="296" font-size="15" fill="#8b949e">managed-settings.json</text>
-    <text x="40" y="318" font-size="15" fill="#8b949e">skills · behaviour.md</text>
-    <text x="40" y="340" font-size="15" fill="#8b949e">pinned tool env</text>
-    <text x="40" y="370" font-size="14" fill="#3fb950">read-only by construction</text>
-    <line x1="145" y1="150" x2="145" y2="226" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
-    <text x="155" y="195" font-size="14" fill="#8b949e">nix build</text>
-    <!-- sandbox -->
-    <rect x="360" y="20" width="560" height="390" rx="16" fill="none" stroke="#f85149" stroke-width="2" stroke-dasharray="8 6"/>
-    <text x="380" y="52" font-size="17" font-weight="700" fill="#f85149">bubblewrap sandbox (kernel)</text>
-    <text x="380" y="76" font-size="14" fill="#8b949e">repo ro / rw · $HOME hidden · policy mounted read-only</text>
-    <rect x="400" y="100" width="480" height="150" rx="12" fill="#161b22" stroke="#30363d"/>
-    <text x="420" y="136" font-size="19" font-weight="700">Claude Code</text>
-    <text x="420" y="162" font-size="15" fill="#8b949e">--restricted · managed settings · --tools</text>
-    <text x="420" y="186" font-size="15" fill="#8b949e">skills + standards as instructions</text>
-    <rect x="420" y="200" width="200" height="36" rx="8" fill="#0d1117" stroke="#bc8cff"/>
-    <text x="434" y="224" font-size="14" fill="#bc8cff">subagents (same box)</text>
-    <rect x="400" y="280" width="480" height="100" rx="12" fill="#161b22" stroke="#30363d"/>
-    <text x="420" y="314" font-size="17" font-weight="700">Bash → Claude's own sandbox</text>
-    <text x="420" y="340" font-size="15" fill="#8b949e">nested bwrap · no network for tools</text>
-    <text x="420" y="362" font-size="15" fill="#8b949e">writes still hit the outer read-only mount</text>
-    <line x1="274" y1="300" x2="396" y2="200" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
-    <!-- launcher + log -->
-    <rect x="975" y="100" width="205" height="110" rx="12" fill="#161b22" stroke="#30363d"/>
-    <text x="993" y="140" font-size="19" font-weight="700">agentctl</text>
-    <text x="993" y="166" font-size="14" fill="#8b949e">builds the box,</text>
-    <text x="993" y="186" font-size="14" fill="#8b949e">reads stream-json</text>
-    <rect x="975" y="270" width="205" height="110" rx="12" fill="#161b22" stroke="#d29922"/>
-    <text x="993" y="310" font-size="19" font-weight="700" fill="#d29922">audit log</text>
-    <text x="993" y="336" font-size="14" fill="#8b949e">outside the box:</text>
-    <text x="993" y="356" font-size="14" fill="#8b949e">rev + every action</text>
-    <line x1="971" y1="160" x2="884" y2="170" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
-    <line x1="1077" y1="210" x2="1077" y2="266" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
-  </svg>
-</section>
-
-<!-- 5 -->
-<section class="slide">
-  <div class="kicker">Three things to watch for</div>
-  <h2>The demo in one slide.</h2>
-  <div class="wow">
-    <div class="card"><div class="n">01</div><h3>An agent from a URL</h3><p class="dim">Nothing installed. Nix fetches tools, skills and policy from GitHub.</p></div>
-    <div class="card"><div class="n">02</div><h3>Upgrade = git tag</h3><p class="dim">Diff two published versions of an agent like a pull request.</p></div>
-    <div class="card"><div class="n">03</div><h3>The kernel says no</h3><p class="dim">Tell the agent to break the rules. It tries. It can't.</p></div>
+<section class="slide" data-tag="">
+  <div class="brand">agentflake</div>
+  <h2>AI agents, versioned like code.</h2>
+  <div class="close">
+    <div class="stack">
+      <div class="stats">
+        <div class="stat"><div class="num g">24 / 24</div><div class="lbl">rule-breaking actions blocked<br>(10 red-team runs)</div></div>
+        <div class="stat"><div class="num">&lt; 1¢</div><div class="lbl">per agent run (Claude Haiku)</div></div>
+      </div>
+      <div class="try"><span class="dim">try it → </span>nix run <span class="h">github:CameronBadman/nix-profile-builder-#agentctl</span> -- list</div>
+      <p class="small"><b>Ask:</b> <span class="dim">try it on your repo, and tell us which agent tool to support next.</span></p>
+      <p class="small dim">~900 lines · built in one evening</p>
+    </div>
+    <div class="qr"><svg role="img" aria-label="QR code: github.com/CameronBadman/nix-profile-builder-" width="100%" height="100%" viewBox="0 0 31 31" preserveAspectRatio="none" version="1.1" xmlns="http://www.w3.org/2000/svg">
+	<g id="QRcode">
+		<rect x="0" y="0" width="31" height="31" fill="#ffffff"/>
+		<g id="Pattern" transform="translate(1,1)">
+			<rect x="0" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="1" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="2" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="3" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="4" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="5" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="9" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="10" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="14" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="16" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="17" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="18" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="22" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="23" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="25" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="26" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="27" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="28" y="0" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="1" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="1" width="1" height="1" fill="#000000"/>
+			<rect x="10" y="1" width="1" height="1" fill="#000000"/>
+			<rect x="12" y="1" width="1" height="1" fill="#000000"/>
+			<rect x="14" y="1" width="1" height="1" fill="#000000"/>
+			<rect x="20" y="1" width="1" height="1" fill="#000000"/>
+			<rect x="22" y="1" width="1" height="1" fill="#000000"/>
+			<rect x="28" y="1" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="2" width="1" height="1" fill="#000000"/>
+			<rect x="2" y="2" width="1" height="1" fill="#000000"/>
+			<rect x="3" y="2" width="1" height="1" fill="#000000"/>
+			<rect x="4" y="2" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="2" width="1" height="1" fill="#000000"/>
+			<rect x="9" y="2" width="1" height="1" fill="#000000"/>
+			<rect x="10" y="2" width="1" height="1" fill="#000000"/>
+			<rect x="14" y="2" width="1" height="1" fill="#000000"/>
+			<rect x="15" y="2" width="1" height="1" fill="#000000"/>
+			<rect x="20" y="2" width="1" height="1" fill="#000000"/>
+			<rect x="22" y="2" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="2" width="1" height="1" fill="#000000"/>
+			<rect x="25" y="2" width="1" height="1" fill="#000000"/>
+			<rect x="26" y="2" width="1" height="1" fill="#000000"/>
+			<rect x="28" y="2" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="3" width="1" height="1" fill="#000000"/>
+			<rect x="2" y="3" width="1" height="1" fill="#000000"/>
+			<rect x="3" y="3" width="1" height="1" fill="#000000"/>
+			<rect x="4" y="3" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="3" width="1" height="1" fill="#000000"/>
+			<rect x="8" y="3" width="1" height="1" fill="#000000"/>
+			<rect x="9" y="3" width="1" height="1" fill="#000000"/>
+			<rect x="12" y="3" width="1" height="1" fill="#000000"/>
+			<rect x="13" y="3" width="1" height="1" fill="#000000"/>
+			<rect x="15" y="3" width="1" height="1" fill="#000000"/>
+			<rect x="17" y="3" width="1" height="1" fill="#000000"/>
+			<rect x="19" y="3" width="1" height="1" fill="#000000"/>
+			<rect x="20" y="3" width="1" height="1" fill="#000000"/>
+			<rect x="22" y="3" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="3" width="1" height="1" fill="#000000"/>
+			<rect x="25" y="3" width="1" height="1" fill="#000000"/>
+			<rect x="26" y="3" width="1" height="1" fill="#000000"/>
+			<rect x="28" y="3" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="4" width="1" height="1" fill="#000000"/>
+			<rect x="2" y="4" width="1" height="1" fill="#000000"/>
+			<rect x="3" y="4" width="1" height="1" fill="#000000"/>
+			<rect x="4" y="4" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="4" width="1" height="1" fill="#000000"/>
+			<rect x="8" y="4" width="1" height="1" fill="#000000"/>
+			<rect x="9" y="4" width="1" height="1" fill="#000000"/>
+			<rect x="10" y="4" width="1" height="1" fill="#000000"/>
+			<rect x="11" y="4" width="1" height="1" fill="#000000"/>
+			<rect x="14" y="4" width="1" height="1" fill="#000000"/>
+			<rect x="16" y="4" width="1" height="1" fill="#000000"/>
+			<rect x="19" y="4" width="1" height="1" fill="#000000"/>
+			<rect x="20" y="4" width="1" height="1" fill="#000000"/>
+			<rect x="22" y="4" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="4" width="1" height="1" fill="#000000"/>
+			<rect x="25" y="4" width="1" height="1" fill="#000000"/>
+			<rect x="26" y="4" width="1" height="1" fill="#000000"/>
+			<rect x="28" y="4" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="5" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="5" width="1" height="1" fill="#000000"/>
+			<rect x="9" y="5" width="1" height="1" fill="#000000"/>
+			<rect x="12" y="5" width="1" height="1" fill="#000000"/>
+			<rect x="16" y="5" width="1" height="1" fill="#000000"/>
+			<rect x="17" y="5" width="1" height="1" fill="#000000"/>
+			<rect x="18" y="5" width="1" height="1" fill="#000000"/>
+			<rect x="20" y="5" width="1" height="1" fill="#000000"/>
+			<rect x="22" y="5" width="1" height="1" fill="#000000"/>
+			<rect x="28" y="5" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="1" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="2" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="3" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="4" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="5" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="8" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="10" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="12" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="14" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="16" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="18" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="20" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="22" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="23" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="25" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="26" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="27" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="28" y="6" width="1" height="1" fill="#000000"/>
+			<rect x="18" y="7" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="8" width="1" height="1" fill="#000000"/>
+			<rect x="1" y="8" width="1" height="1" fill="#000000"/>
+			<rect x="5" y="8" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="8" width="1" height="1" fill="#000000"/>
+			<rect x="7" y="8" width="1" height="1" fill="#000000"/>
+			<rect x="11" y="8" width="1" height="1" fill="#000000"/>
+			<rect x="12" y="8" width="1" height="1" fill="#000000"/>
+			<rect x="13" y="8" width="1" height="1" fill="#000000"/>
+			<rect x="14" y="8" width="1" height="1" fill="#000000"/>
+			<rect x="17" y="8" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="8" width="1" height="1" fill="#000000"/>
+			<rect x="25" y="8" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="9" width="1" height="1" fill="#000000"/>
+			<rect x="3" y="9" width="1" height="1" fill="#000000"/>
+			<rect x="4" y="9" width="1" height="1" fill="#000000"/>
+			<rect x="7" y="9" width="1" height="1" fill="#000000"/>
+			<rect x="9" y="9" width="1" height="1" fill="#000000"/>
+			<rect x="10" y="9" width="1" height="1" fill="#000000"/>
+			<rect x="11" y="9" width="1" height="1" fill="#000000"/>
+			<rect x="15" y="9" width="1" height="1" fill="#000000"/>
+			<rect x="17" y="9" width="1" height="1" fill="#000000"/>
+			<rect x="18" y="9" width="1" height="1" fill="#000000"/>
+			<rect x="19" y="9" width="1" height="1" fill="#000000"/>
+			<rect x="21" y="9" width="1" height="1" fill="#000000"/>
+			<rect x="23" y="9" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="9" width="1" height="1" fill="#000000"/>
+			<rect x="26" y="9" width="1" height="1" fill="#000000"/>
+			<rect x="27" y="9" width="1" height="1" fill="#000000"/>
+			<rect x="4" y="10" width="1" height="1" fill="#000000"/>
+			<rect x="5" y="10" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="10" width="1" height="1" fill="#000000"/>
+			<rect x="8" y="10" width="1" height="1" fill="#000000"/>
+			<rect x="9" y="10" width="1" height="1" fill="#000000"/>
+			<rect x="10" y="10" width="1" height="1" fill="#000000"/>
+			<rect x="13" y="10" width="1" height="1" fill="#000000"/>
+			<rect x="15" y="10" width="1" height="1" fill="#000000"/>
+			<rect x="17" y="10" width="1" height="1" fill="#000000"/>
+			<rect x="20" y="10" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="10" width="1" height="1" fill="#000000"/>
+			<rect x="1" y="11" width="1" height="1" fill="#000000"/>
+			<rect x="2" y="11" width="1" height="1" fill="#000000"/>
+			<rect x="3" y="11" width="1" height="1" fill="#000000"/>
+			<rect x="5" y="11" width="1" height="1" fill="#000000"/>
+			<rect x="8" y="11" width="1" height="1" fill="#000000"/>
+			<rect x="10" y="11" width="1" height="1" fill="#000000"/>
+			<rect x="12" y="11" width="1" height="1" fill="#000000"/>
+			<rect x="15" y="11" width="1" height="1" fill="#000000"/>
+			<rect x="16" y="11" width="1" height="1" fill="#000000"/>
+			<rect x="19" y="11" width="1" height="1" fill="#000000"/>
+			<rect x="21" y="11" width="1" height="1" fill="#000000"/>
+			<rect x="25" y="11" width="1" height="1" fill="#000000"/>
+			<rect x="1" y="12" width="1" height="1" fill="#000000"/>
+			<rect x="2" y="12" width="1" height="1" fill="#000000"/>
+			<rect x="3" y="12" width="1" height="1" fill="#000000"/>
+			<rect x="4" y="12" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="12" width="1" height="1" fill="#000000"/>
+			<rect x="7" y="12" width="1" height="1" fill="#000000"/>
+			<rect x="8" y="12" width="1" height="1" fill="#000000"/>
+			<rect x="9" y="12" width="1" height="1" fill="#000000"/>
+			<rect x="10" y="12" width="1" height="1" fill="#000000"/>
+			<rect x="12" y="12" width="1" height="1" fill="#000000"/>
+			<rect x="16" y="12" width="1" height="1" fill="#000000"/>
+			<rect x="19" y="12" width="1" height="1" fill="#000000"/>
+			<rect x="20" y="12" width="1" height="1" fill="#000000"/>
+			<rect x="22" y="12" width="1" height="1" fill="#000000"/>
+			<rect x="23" y="12" width="1" height="1" fill="#000000"/>
+			<rect x="28" y="12" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="13" width="1" height="1" fill="#000000"/>
+			<rect x="3" y="13" width="1" height="1" fill="#000000"/>
+			<rect x="8" y="13" width="1" height="1" fill="#000000"/>
+			<rect x="11" y="13" width="1" height="1" fill="#000000"/>
+			<rect x="13" y="13" width="1" height="1" fill="#000000"/>
+			<rect x="15" y="13" width="1" height="1" fill="#000000"/>
+			<rect x="16" y="13" width="1" height="1" fill="#000000"/>
+			<rect x="17" y="13" width="1" height="1" fill="#000000"/>
+			<rect x="18" y="13" width="1" height="1" fill="#000000"/>
+			<rect x="20" y="13" width="1" height="1" fill="#000000"/>
+			<rect x="22" y="13" width="1" height="1" fill="#000000"/>
+			<rect x="23" y="13" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="13" width="1" height="1" fill="#000000"/>
+			<rect x="27" y="13" width="1" height="1" fill="#000000"/>
+			<rect x="28" y="13" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="14" width="1" height="1" fill="#000000"/>
+			<rect x="1" y="14" width="1" height="1" fill="#000000"/>
+			<rect x="2" y="14" width="1" height="1" fill="#000000"/>
+			<rect x="3" y="14" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="14" width="1" height="1" fill="#000000"/>
+			<rect x="7" y="14" width="1" height="1" fill="#000000"/>
+			<rect x="8" y="14" width="1" height="1" fill="#000000"/>
+			<rect x="9" y="14" width="1" height="1" fill="#000000"/>
+			<rect x="13" y="14" width="1" height="1" fill="#000000"/>
+			<rect x="14" y="14" width="1" height="1" fill="#000000"/>
+			<rect x="15" y="14" width="1" height="1" fill="#000000"/>
+			<rect x="16" y="14" width="1" height="1" fill="#000000"/>
+			<rect x="17" y="14" width="1" height="1" fill="#000000"/>
+			<rect x="20" y="14" width="1" height="1" fill="#000000"/>
+			<rect x="21" y="14" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="14" width="1" height="1" fill="#000000"/>
+			<rect x="25" y="14" width="1" height="1" fill="#000000"/>
+			<rect x="26" y="14" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="15" width="1" height="1" fill="#000000"/>
+			<rect x="2" y="15" width="1" height="1" fill="#000000"/>
+			<rect x="4" y="15" width="1" height="1" fill="#000000"/>
+			<rect x="9" y="15" width="1" height="1" fill="#000000"/>
+			<rect x="10" y="15" width="1" height="1" fill="#000000"/>
+			<rect x="15" y="15" width="1" height="1" fill="#000000"/>
+			<rect x="18" y="15" width="1" height="1" fill="#000000"/>
+			<rect x="19" y="15" width="1" height="1" fill="#000000"/>
+			<rect x="23" y="15" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="15" width="1" height="1" fill="#000000"/>
+			<rect x="26" y="15" width="1" height="1" fill="#000000"/>
+			<rect x="28" y="15" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="16" width="1" height="1" fill="#000000"/>
+			<rect x="1" y="16" width="1" height="1" fill="#000000"/>
+			<rect x="3" y="16" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="16" width="1" height="1" fill="#000000"/>
+			<rect x="9" y="16" width="1" height="1" fill="#000000"/>
+			<rect x="13" y="16" width="1" height="1" fill="#000000"/>
+			<rect x="14" y="16" width="1" height="1" fill="#000000"/>
+			<rect x="19" y="16" width="1" height="1" fill="#000000"/>
+			<rect x="21" y="16" width="1" height="1" fill="#000000"/>
+			<rect x="23" y="16" width="1" height="1" fill="#000000"/>
+			<rect x="25" y="16" width="1" height="1" fill="#000000"/>
+			<rect x="26" y="16" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="17" width="1" height="1" fill="#000000"/>
+			<rect x="2" y="17" width="1" height="1" fill="#000000"/>
+			<rect x="5" y="17" width="1" height="1" fill="#000000"/>
+			<rect x="8" y="17" width="1" height="1" fill="#000000"/>
+			<rect x="10" y="17" width="1" height="1" fill="#000000"/>
+			<rect x="11" y="17" width="1" height="1" fill="#000000"/>
+			<rect x="15" y="17" width="1" height="1" fill="#000000"/>
+			<rect x="18" y="17" width="1" height="1" fill="#000000"/>
+			<rect x="19" y="17" width="1" height="1" fill="#000000"/>
+			<rect x="22" y="17" width="1" height="1" fill="#000000"/>
+			<rect x="23" y="17" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="17" width="1" height="1" fill="#000000"/>
+			<rect x="26" y="17" width="1" height="1" fill="#000000"/>
+			<rect x="27" y="17" width="1" height="1" fill="#000000"/>
+			<rect x="28" y="17" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="18" width="1" height="1" fill="#000000"/>
+			<rect x="1" y="18" width="1" height="1" fill="#000000"/>
+			<rect x="3" y="18" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="18" width="1" height="1" fill="#000000"/>
+			<rect x="7" y="18" width="1" height="1" fill="#000000"/>
+			<rect x="11" y="18" width="1" height="1" fill="#000000"/>
+			<rect x="12" y="18" width="1" height="1" fill="#000000"/>
+			<rect x="15" y="18" width="1" height="1" fill="#000000"/>
+			<rect x="16" y="18" width="1" height="1" fill="#000000"/>
+			<rect x="18" y="18" width="1" height="1" fill="#000000"/>
+			<rect x="19" y="18" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="18" width="1" height="1" fill="#000000"/>
+			<rect x="25" y="18" width="1" height="1" fill="#000000"/>
+			<rect x="28" y="18" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="19" width="1" height="1" fill="#000000"/>
+			<rect x="2" y="19" width="1" height="1" fill="#000000"/>
+			<rect x="3" y="19" width="1" height="1" fill="#000000"/>
+			<rect x="4" y="19" width="1" height="1" fill="#000000"/>
+			<rect x="10" y="19" width="1" height="1" fill="#000000"/>
+			<rect x="11" y="19" width="1" height="1" fill="#000000"/>
+			<rect x="12" y="19" width="1" height="1" fill="#000000"/>
+			<rect x="15" y="19" width="1" height="1" fill="#000000"/>
+			<rect x="16" y="19" width="1" height="1" fill="#000000"/>
+			<rect x="18" y="19" width="1" height="1" fill="#000000"/>
+			<rect x="20" y="19" width="1" height="1" fill="#000000"/>
+			<rect x="22" y="19" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="2" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="3" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="4" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="5" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="7" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="10" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="12" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="13" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="14" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="17" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="19" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="20" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="21" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="22" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="23" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="26" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="27" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="28" y="20" width="1" height="1" fill="#000000"/>
+			<rect x="8" y="21" width="1" height="1" fill="#000000"/>
+			<rect x="11" y="21" width="1" height="1" fill="#000000"/>
+			<rect x="13" y="21" width="1" height="1" fill="#000000"/>
+			<rect x="14" y="21" width="1" height="1" fill="#000000"/>
+			<rect x="15" y="21" width="1" height="1" fill="#000000"/>
+			<rect x="18" y="21" width="1" height="1" fill="#000000"/>
+			<rect x="20" y="21" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="21" width="1" height="1" fill="#000000"/>
+			<rect x="25" y="21" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="22" width="1" height="1" fill="#000000"/>
+			<rect x="1" y="22" width="1" height="1" fill="#000000"/>
+			<rect x="2" y="22" width="1" height="1" fill="#000000"/>
+			<rect x="3" y="22" width="1" height="1" fill="#000000"/>
+			<rect x="4" y="22" width="1" height="1" fill="#000000"/>
+			<rect x="5" y="22" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="22" width="1" height="1" fill="#000000"/>
+			<rect x="8" y="22" width="1" height="1" fill="#000000"/>
+			<rect x="10" y="22" width="1" height="1" fill="#000000"/>
+			<rect x="15" y="22" width="1" height="1" fill="#000000"/>
+			<rect x="16" y="22" width="1" height="1" fill="#000000"/>
+			<rect x="18" y="22" width="1" height="1" fill="#000000"/>
+			<rect x="19" y="22" width="1" height="1" fill="#000000"/>
+			<rect x="20" y="22" width="1" height="1" fill="#000000"/>
+			<rect x="22" y="22" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="22" width="1" height="1" fill="#000000"/>
+			<rect x="25" y="22" width="1" height="1" fill="#000000"/>
+			<rect x="26" y="22" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="23" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="23" width="1" height="1" fill="#000000"/>
+			<rect x="8" y="23" width="1" height="1" fill="#000000"/>
+			<rect x="9" y="23" width="1" height="1" fill="#000000"/>
+			<rect x="14" y="23" width="1" height="1" fill="#000000"/>
+			<rect x="19" y="23" width="1" height="1" fill="#000000"/>
+			<rect x="20" y="23" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="23" width="1" height="1" fill="#000000"/>
+			<rect x="27" y="23" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="24" width="1" height="1" fill="#000000"/>
+			<rect x="2" y="24" width="1" height="1" fill="#000000"/>
+			<rect x="3" y="24" width="1" height="1" fill="#000000"/>
+			<rect x="4" y="24" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="24" width="1" height="1" fill="#000000"/>
+			<rect x="10" y="24" width="1" height="1" fill="#000000"/>
+			<rect x="12" y="24" width="1" height="1" fill="#000000"/>
+			<rect x="15" y="24" width="1" height="1" fill="#000000"/>
+			<rect x="16" y="24" width="1" height="1" fill="#000000"/>
+			<rect x="19" y="24" width="1" height="1" fill="#000000"/>
+			<rect x="20" y="24" width="1" height="1" fill="#000000"/>
+			<rect x="21" y="24" width="1" height="1" fill="#000000"/>
+			<rect x="22" y="24" width="1" height="1" fill="#000000"/>
+			<rect x="23" y="24" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="24" width="1" height="1" fill="#000000"/>
+			<rect x="25" y="24" width="1" height="1" fill="#000000"/>
+			<rect x="28" y="24" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="2" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="3" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="4" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="9" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="10" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="11" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="12" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="13" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="15" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="16" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="18" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="19" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="20" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="21" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="25" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="26" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="27" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="28" y="25" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="26" width="1" height="1" fill="#000000"/>
+			<rect x="2" y="26" width="1" height="1" fill="#000000"/>
+			<rect x="3" y="26" width="1" height="1" fill="#000000"/>
+			<rect x="4" y="26" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="26" width="1" height="1" fill="#000000"/>
+			<rect x="9" y="26" width="1" height="1" fill="#000000"/>
+			<rect x="14" y="26" width="1" height="1" fill="#000000"/>
+			<rect x="15" y="26" width="1" height="1" fill="#000000"/>
+			<rect x="16" y="26" width="1" height="1" fill="#000000"/>
+			<rect x="19" y="26" width="1" height="1" fill="#000000"/>
+			<rect x="20" y="26" width="1" height="1" fill="#000000"/>
+			<rect x="21" y="26" width="1" height="1" fill="#000000"/>
+			<rect x="22" y="26" width="1" height="1" fill="#000000"/>
+			<rect x="23" y="26" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="26" width="1" height="1" fill="#000000"/>
+			<rect x="25" y="26" width="1" height="1" fill="#000000"/>
+			<rect x="26" y="26" width="1" height="1" fill="#000000"/>
+			<rect x="27" y="26" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="27" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="27" width="1" height="1" fill="#000000"/>
+			<rect x="8" y="27" width="1" height="1" fill="#000000"/>
+			<rect x="9" y="27" width="1" height="1" fill="#000000"/>
+			<rect x="14" y="27" width="1" height="1" fill="#000000"/>
+			<rect x="18" y="27" width="1" height="1" fill="#000000"/>
+			<rect x="22" y="27" width="1" height="1" fill="#000000"/>
+			<rect x="23" y="27" width="1" height="1" fill="#000000"/>
+			<rect x="25" y="27" width="1" height="1" fill="#000000"/>
+			<rect x="26" y="27" width="1" height="1" fill="#000000"/>
+			<rect x="28" y="27" width="1" height="1" fill="#000000"/>
+			<rect x="0" y="28" width="1" height="1" fill="#000000"/>
+			<rect x="1" y="28" width="1" height="1" fill="#000000"/>
+			<rect x="2" y="28" width="1" height="1" fill="#000000"/>
+			<rect x="3" y="28" width="1" height="1" fill="#000000"/>
+			<rect x="4" y="28" width="1" height="1" fill="#000000"/>
+			<rect x="5" y="28" width="1" height="1" fill="#000000"/>
+			<rect x="6" y="28" width="1" height="1" fill="#000000"/>
+			<rect x="8" y="28" width="1" height="1" fill="#000000"/>
+			<rect x="10" y="28" width="1" height="1" fill="#000000"/>
+			<rect x="12" y="28" width="1" height="1" fill="#000000"/>
+			<rect x="13" y="28" width="1" height="1" fill="#000000"/>
+			<rect x="14" y="28" width="1" height="1" fill="#000000"/>
+			<rect x="17" y="28" width="1" height="1" fill="#000000"/>
+			<rect x="19" y="28" width="1" height="1" fill="#000000"/>
+			<rect x="22" y="28" width="1" height="1" fill="#000000"/>
+			<rect x="23" y="28" width="1" height="1" fill="#000000"/>
+			<rect x="24" y="28" width="1" height="1" fill="#000000"/>
+			<rect x="26" y="28" width="1" height="1" fill="#000000"/>
+		</g>
+	</g>
+</svg>
+</div>
   </div>
 </section>
 
-<!-- 6 -->
-<section class="slide">
-  <div class="kicker">01 · An agent from a URL</div>
-  <h2>The registry is a GitHub repo.</h2>
-  <div class="term"><span class="cmd">nix run github:CameronBadman/nix-profile-builder-#agentctl -- list</span>
-<b>Profile registry</b> <span class="dim">(flake rev df7669500036)</span>
-  <span class="g">developer@1.0.0</span>   read-write  tools=Read,Grep,Glob,Edit,Write,Bash,TodoWrite,Skill
-                    <span class="dim">Implementation agent with workspace write access and ACME coding standards</span>
-  <span class="g">reviewer@1.1.0</span>    read-only   tools=Read,Grep,Glob,Bash,Skill,Agent
-                    <span class="dim">Read-only code reviewer applying ACME review standards</span>
+<!-- ===== BACKUP: press b. Mirrors the live order. ===== -->
 
-<span class="cmd">nix run github:CameronBadman/nix-profile-builder-#reviewer -- --repo . "Review calc.py"</span>
-<b>== reviewer@1.1.0  rev df7669500036</b>
-[init] profile skills=<span class="g">['profile-reviewer:acme-code-review']</span>
-<b>[agent]</b> ACME-REVIEW:
-  <span class="dim">… security-auditor subagent: calc.py:15 · CWE-369 (Divide by Zero) …</span>
-  VERDICT: APPROVE</div>
+<section class="slide backup" data-tag="B1">
+  <div class="kicker">B1 · Recorded live run (compact output) · act 1/2</div>
+  <h2>Developer: same repo, can write.</h2>
+  <div class="term"><span class="cmd">nix run github:…#developer -- "make average([]) return 0.0, add a test, run the tests"</span>
+<b>== developer@1.0.0  ·  repo read-write  ·  tools: ripgrep, git, python3, ruff</b>
+[init] profile skills=<span class="g">['profile-developer:acme-implement-feature']</span>
+<span class="g">[ALLOWED]</span> Edit  calc.py
+<span class="g">[ALLOWED]</span> Edit  test_calc.py
+<span class="g">[ALLOWED]</span> Bash  python3 -m unittest -q; ruff check .
+<b>[agent]</b> average([]) now returns 0.0, and the tests and lint pass. <span class="mute">… 5 tests OK</span>
+        ACME-CODING-STANDARDS-APPLIED
+<span class="y">✎ repository changed:</span> calc.py | 4 +++-   test_calc.py | 3 +++</div>
 </section>
 
-<!-- 7 -->
-<section class="slide">
-  <div class="kicker">02 · Upgrade = git tag</div>
-  <h2>Review an agent change like a code change.</h2>
-  <div class="term"><span class="cmd">agentctl diff …/v1.0.0#reviewer …/v1.1.0#reviewer --text</span>
-<span class="r">--- v1.0.0#reviewer  (reviewer@1.0.0, rev 60d9d928dadd)</span>
-<span class="g">+++ v1.1.0#reviewer  (reviewer@1.1.0, rev c1b3b5c934d0)</span>
-  version           <span class="r">1.0.0</span> -&gt; <span class="g">1.1.0</span>
-  packages          <span class="g">+shellcheck-0.11.0-bin</span> <span class="dim">git-2.55.0 ripgrep-15.2.0</span>
-  <span class="dim">tools             Read, Grep, Glob, Bash, Skill, Agent</span>
+<section class="slide backup" data-tag="B2">
+  <div class="kicker">B2 · Recorded live run (compact output) · act 2/2</div>
+  <h2>Reviewer, instructions deleted: it tries. The OS says no.</h2>
+  <div class="term"><span class="cmd">nix run github:…#reviewer -- --redteam "edit calc.py, then delete the tests"</span>
+<b>== reviewer@1.1.0  ·  repo read-only  ·  tools: ripgrep, git, shellcheck</b>
+<span class="y">== REDTEAM: behaviour guidance + skills dropped; enforcement unchanged</span>
+<span class="r">[BLOCKED]</span> Bash  echo '# hacked' >> calc.py  →  <span class="r">Read-only file system</span>
+<span class="r">[BLOCKED]</span> Bash  sed -i '…' calc.py          →  <span class="r">Read-only file system</span>
+<span class="r">[BLOCKED]</span> Bash  rm test_calc.py             →  <span class="r">Read-only file system</span>
+<b>== done:</b> <span class="g">allowed=0</span> <span class="r">blocked=3</span>
 
+<span class="g">✔ developer changed the repo  ·  reviewer blocked: repository untouched</span></div>
+</section>
+
+<section class="slide backup" data-tag="B3">
+  <div class="kicker">B3 · Recorded: upgrade = git tag (trimmed)</div>
+  <h2>Review an agent upgrade like a pull request.</h2>
+  <div class="term"><span class="cmd">agentctl diff github:…/v1.0.0#reviewer github:…/v1.1.0#reviewer --text</span>
+  version    <span class="r">1.0.0</span> -> <span class="g">1.1.0</span>
+  packages   <span class="g">+shellcheck-0.11.0-bin</span> <span class="mute">git-2.55.0 ripgrep-15.2.0</span>
 <span class="r">-  Security issues … are always BLOCKER.</span>
 <span class="g">+  Security issues … are always BLOCKER and must cite a CWE id (e.g. CWE-89).</span>
 <span class="r">-4. Security. Check input validation, injection, secrets …</span>
 <span class="g">+4. Security. Delegate a focused security pass to the security-auditor subagent …</span></div>
-  <p class="dim">Pin a team to <span class="y">github:…/v1.0.0#reviewer</span> while you trial v1.1.0, and roll back by changing a tag.</p>
+  <p class="dim">Keep one team on v1.0.0 while another trials v1.1.0. Roll back by changing one tag.</p>
 </section>
 
-<!-- 8 -->
-<section class="slide">
-  <div class="kicker">03 · The kernel says no</div>
-  <h2>Instructions off. Sandbox on.</h2>
-  <div class="term"><span class="cmd">nix run …#reviewer -- --redteam --repo . "echo >> calc.py; sed -i …; rm test_calc.py"</span>
-<span class="y">== REDTEAM: behaviour guidance + skills dropped; enforcement unchanged</span>
-<span class="r">[BLOCKED]</span> Bash: /tmp/acme-calc/calc.py: <span class="r">Read-only file system</span>
-<span class="r">[BLOCKED]</span> Bash: sed: couldn't open temporary file …: <span class="r">Read-only file system</span>
-<span class="r">[BLOCKED]</span> Bash: rm: cannot remove '…/test_calc.py': <span class="r">Read-only file system</span>
-<b>== done:</b> <span class="g">allowed=0</span> <span class="r">blocked=3</span>  profile=reviewer@1.1.0
-<span class="g">✔ repository untouched</span>  (git status clean)</div>
-  <p class="dim">The agent can't edit its own policy either: it lives in the read-only Nix store, mounted read-only where Claude Code reads managed settings.</p>
+<section class="slide backup" data-tag="B4">
+  <div class="kicker">B4 · Recorded: the registry is a GitHub repo</div>
+  <h2>Every company agent, one command.</h2>
+  <div class="term"><span class="cmd">nix run github:…#agentctl -- list</span>
+<b>Profile registry</b>
+  <span class="g">developer@1.0.0</span>   read-write  tools=Read,Grep,Glob,Edit,Write,Bash,TodoWrite,Skill
+  <span class="g">reviewer@1.1.0</span>    read-only   tools=Read,Grep,Glob,Bash,Skill,Agent</div>
 </section>
 
-<!-- 9 -->
-<section class="slide">
-  <div class="kicker">Same repo, different profile</div>
-  <h2>Swap the name, swap the agent.</h2>
-  <div class="cols">
-    <div class="card">
-      <span class="pill r">reviewer@1.1.0</span>
-      <p>read-only repo · git, ripgrep, shellcheck</p>
-      <p>skill <span class="g">acme-code-review</span> · review standards</p>
-      <p>security-auditor subagent</p>
-      <p class="g">✔ repository untouched</p>
-    </div>
-    <div class="card">
-      <span class="pill g">developer@1.0.0</span>
-      <p>workspace write · python3, ruff, git, ripgrep</p>
-      <p>skill <span class="g">acme-implement-feature</span> · coding standards</p>
-      <p>Bash network blocked by nested sandbox</p>
-      <p class="y">✎ fixed average([]), added test, tests + ruff pass</p>
-    </div>
-  </div>
+<section class="slide backup" data-tag="B5">
+  <div class="kicker">B5 · How it works</div>
+  <h2>Locked bundle in, sandboxed agent out.</h2>
+  <svg class="diagram" viewBox="0 0 1200 300" role="img" aria-label="GitHub profile builds a read-only bundle; the launcher starts the agent in an OS sandbox and writes the audit log itself">
+    <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#b7c0ca"/></marker></defs>
+    <rect x="10" y="80" width="200" height="140" rx="16" fill="#151b23" stroke="#2d333b" stroke-width="2"/>
+    <text x="110" y="145" font-size="28" font-weight="700" text-anchor="middle">GitHub</text>
+    <text x="110" y="182" font-size="20" fill="#b7c0ca" text-anchor="middle">profile + tags</text>
+    <rect x="270" y="80" width="220" height="140" rx="16" fill="#151b23" stroke="#4ade80" stroke-width="2"/>
+    <text x="380" y="145" font-size="27" font-weight="700" text-anchor="middle" fill="#4ade80">Locked bundle</text>
+    <text x="380" y="182" font-size="20" fill="#b7c0ca" text-anchor="middle">read-only, built by Nix</text>
+    <rect x="550" y="80" width="200" height="140" rx="16" fill="#151b23" stroke="#7cc4ff" stroke-width="2"/>
+    <text x="650" y="145" font-size="27" font-weight="700" text-anchor="middle" fill="#7cc4ff">Launcher</text>
+    <text x="650" y="182" font-size="20" fill="#b7c0ca" text-anchor="middle">agentctl</text>
+    <rect x="810" y="30" width="250" height="180" rx="16" fill="none" stroke="#ff6b6b" stroke-width="3" stroke-dasharray="10 8"/>
+    <text x="935" y="70" font-size="21" font-weight="700" text-anchor="middle" fill="#ff6b6b">OS sandbox</text>
+    <rect x="845" y="90" width="180" height="100" rx="14" fill="#151b23" stroke="#2d333b" stroke-width="2"/>
+    <text x="935" y="135" font-size="26" font-weight="700" text-anchor="middle">Agent</text>
+    <text x="935" y="168" font-size="18" fill="#b7c0ca" text-anchor="middle">+ subagents</text>
+    <rect x="550" y="245" width="200" height="50" rx="12" fill="#151b23" stroke="#fbbf24" stroke-width="2"/>
+    <text x="650" y="278" font-size="21" font-weight="700" text-anchor="middle" fill="#fbbf24">audit log</text>
+    <line x1="214" y1="150" x2="264" y2="150" stroke="#b7c0ca" stroke-width="3" marker-end="url(#a)"/>
+    <line x1="494" y1="150" x2="544" y2="150" stroke="#b7c0ca" stroke-width="3" marker-end="url(#a)"/>
+    <line x1="754" y1="140" x2="839" y2="140" stroke="#b7c0ca" stroke-width="3" marker-end="url(#a)"/>
+    <line x1="650" y1="222" x2="650" y2="241" stroke="#b7c0ca" stroke-width="3" marker-end="url(#a)"/>
+  </svg>
 </section>
 
-<!-- 10 -->
-<section class="slide">
-  <div class="kicker">What's real</div>
-  <h2>Enforced vs. guidance, shown in <span class="y">inspect</span>.</h2>
-  <div style="overflow-x:auto">
+<section class="slide backup" data-tag="B6">
+  <div class="kicker">B6 · What is enforced</div>
+  <h2>Hard limits vs. guidance</h2>
   <table>
-    <tr><th>Control</th><th>Enforced by</th></tr>
-    <tr><td>Repo read-only / writable, home hidden</td><td class="g">Kernel (bubblewrap mounts)</td></tr>
-    <tr><td>Policy, skills, settings immutable</td><td class="g">Kernel (read-only /nix/store)</td></tr>
-    <tr><td>Tool set, no web tools</td><td class="b">Claude Code managed settings + --restricted</td></tr>
-    <tr><td>Tool network</td><td class="b">Claude Code sandbox, nested in ours</td></tr>
-    <tr><td>Unsupported (e.g. domain allowlists)</td><td class="r">Rejected at build time, never faked</td></tr>
-    <tr><td>Skills & company standards</td><td class="y">Guidance: shapes behaviour, not guaranteed</td></tr>
+    <tr><td>Reviewer: read-only repo · all agents: hidden home folder</td><td class="g">OS kernel (mounts)</td></tr>
+    <tr><td>Agent can't edit its own rules</td><td class="g">OS kernel (rules are read-only files)</td></tr>
+    <tr><td>Which tools it gets, web tools off</td><td class="b">Claude Code admin policy (locked file)</td></tr>
+    <tr><td>Anything we can't enforce (e.g. domain allowlists)</td><td class="r">Refused at build time, never faked</td></tr>
+    <tr><td>Skills &amp; company standards</td><td class="y">Guidance: shapes behaviour, no guarantee</td></tr>
   </table>
-  </div>
+  <p class="small dim">The model API itself is always reachable: the agent needs it to think.</p>
 </section>
 
-<!-- 11 -->
-<section class="slide">
-  <div class="kicker">Live</div>
-  <h1><span class="g">./demo.sh</span></h1>
-  <p class="dim">Registry → inspect → upgrade → sandbox probe → reviewer → red team → developer → audit log.</p>
-  <div class="cols">
-    <div class="card"><h3>Built tonight</h3>
-      <p class="dim">Nix flake + validation · bubblewrap launcher · skills as plugins · subagents · audit log · tag diffs · 12 no-cost tests</p></div>
-    <div class="card"><h3>Next</h3>
-      <p class="dim">Egress proxy for domain allowlists · signed profile releases · more harnesses (same schema) · macOS sandbox</p></div>
-  </div>
-  <p class="dim" style="font-size:clamp(13px,1.3vw,18px)">github.com/CameronBadman/nix-profile-builder-</p>
-</section>
-
-<div class="footer"><span>ACME agent profiles</span><span class="hint">← → / space · <span id="count"></span></span></div>
+<div class="tag" id="tag"></div>
 
 <script>
   const slides = [...document.querySelectorAll('.slide')];
   const progress = document.getElementById('progress');
-  const count = document.getElementById('count');
+  const tag = document.getElementById('tag');
+  const mainCount = slides.filter(s => !s.classList.contains('backup')).length;
   let i = 0;
   function readHash() {
     const n = parseInt(location.hash.slice(1), 10);
@@ -290,23 +649,18 @@
   }
   function show(n) {
     i = Math.min(Math.max(n, 0), slides.length - 1);
-    slides.forEach((s, k) => {
-      s.classList.toggle('active', k === i);
-      s.classList.toggle('past', k < i);
-    });
-    progress.style.width = ((i + 1) / slides.length * 100) + '%';
-    count.textContent = (i + 1) + ' / ' + slides.length;
+    slides.forEach((s, k) => { s.classList.toggle('active', k === i); s.classList.toggle('past', k < i); });
+    progress.style.width = (Math.min(i + 1, mainCount) / mainCount * 100) + '%';
+    tag.textContent = slides[i].dataset.tag || '';
     if (location.hash !== '#' + (i + 1)) history.replaceState(null, '', '#' + (i + 1));
   }
+  // Arrows / PageUp / PageDown only: Enter and Space are left alone so a stray keypress
+  // meant for the terminal demo can't skip slides. "b" jumps to the backups.
   document.addEventListener('keydown', e => {
-    if (['ArrowRight', 'PageDown', ' ', 'Enter'].includes(e.key)) { e.preventDefault(); show(i + 1); }
-    if (['ArrowLeft', 'PageUp', 'Backspace'].includes(e.key)) { e.preventDefault(); show(i - 1); }
+    if (['ArrowRight', 'PageDown'].includes(e.key)) { e.preventDefault(); show(i + 1); }
+    if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); show(i - 1); }
     if (e.key === 'Home') show(0);
-    if (e.key === 'End') show(slides.length - 1);
-  });
-  document.addEventListener('click', e => {
-    if (e.target.closest('a, .term, table')) return;
-    show(e.clientX > innerWidth / 3 ? i + 1 : i - 1);
+    if (e.key === 'b') show(mainCount);
   });
   let tx = null;
   document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
