@@ -61,7 +61,7 @@ harness-neutral, and an adapter is roughly one function.
 **What does it cost / how fast?** Measured: $0.0016–0.0052 per run on Haiku; first action 3–7 s after launch (cached), full runs 5–39 s.
 
 **Was this pre-built?** Built this evening: the commit history starts at 18:04 (the first commit
-already holds a working core because it was committed after the first hour of work), about 900 lines.
+already holds a working core: the project folder was created at 17:37, so it reflects ~30 minutes of work), about 900 lines.
 
 **Claude Code already has permissions and a sandbox: what's new?** Those are per-laptop settings each
 developer (or the agent) can change. agentflake makes them a company artifact: one versioned file on
