@@ -42,7 +42,7 @@
   .term .mute { color: var(--faint); }
   .term .bold { font-weight: 800; }
   .term.rec { font-size: clamp(11px, 1.25vw, 18px); white-space: pre-wrap; }
-  .cols { display: grid; grid-template-columns: 1.35fr 1fr; gap: 3vw; align-items: center; }
+  .cols { display: grid; grid-template-columns: 1.5fr 1fr; gap: 3vw; align-items: center; }
   .stack { display: grid; gap: 2.6vh; }
   .stack p b { font-weight: 800; }
   .strip { font: 600 clamp(14px, 1.7vw, 24px) var(--mono); background: var(--panel); border: 1px solid var(--line);
@@ -92,7 +92,8 @@
 name = <span class="g">"reviewer"</span>;
 version = <span class="g">"1.1.0"</span>;
 packages = [ <span class="g">"ripgrep" "git" "shellcheck"</span> ];
-tools = [ <span class="g">"Read" "Grep" "Glob" "Bash" "Skill" "Agent"</span> ];
+tools = [ <span class="g">"Read" "Grep" "Glob"</span>
+          <span class="g">"Bash" "Skill" "Agent"</span> ];
 filesystem.workspace = <span class="g">"read-only"</span>;
 network.tools = <span class="g">"deny"</span>;   <span class="mute"># web tools off</span>
 skills = [ <span class="g">"acme-code-review"</span> ];
