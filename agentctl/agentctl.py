@@ -162,13 +162,14 @@ def cmd_inspect(args):
 
 # ---------------------------------------------------------------- sandbox
 
-def bwrap_argv(policy, bundle, repo, config_dir, claude_real, token):
+def bwrap_argv(policy, bundle, repo, config_dir, claude_real, token, interactive=False):
     ws_bind = "--bind" if policy["filesystem"]["workspace"] == "read-write" else "--ro-bind"
     env = {
         "HOME": SANDBOX_HOME,
         "PATH": f"{policy['envPath']}/bin:/opt/claude/bin",
         "SHELL": f"{policy['envPath']}/bin/bash",
         "TERM": os.environ.get("TERM", "dumb"),
+        "COLORTERM": os.environ.get("COLORTERM", ""),
         "LANG": "C.UTF-8",
         "CLAUDE_CONFIG_DIR": CONFIG_DIR,
         "AGENT_PROFILE": policy["profileId"],
@@ -177,7 +178,9 @@ def bwrap_argv(policy, bundle, repo, config_dir, claude_real, token):
     }
     if token:
         env["CLAUDE_CODE_OAUTH_TOKEN"] = token
-    argv = [policy["bwrap"], "--die-with-parent", "--new-session",
+    # --new-session (setsid) blocks TIOCSTI injection but detaches the controlling terminal, which an
+    # interactive TUI needs; interactive mode drops it (kernels >= 6.2 disable TIOCSTI by default).
+    argv = [policy["bwrap"], "--die-with-parent"] + ([] if interactive else ["--new-session"]) + [
             "--unshare-all", "--share-net", "--clearenv",
             # minimal root: system libs, nix store, certs; no /home, /root, /var, /srv
             "--ro-bind", "/usr", "/usr", "--ro-bind", "/nix", "/nix",
@@ -354,6 +357,28 @@ class Audit:
                 self.say(f"[result] cost=${m.get('total_cost_usd')} turns={m.get('num_turns')}")
 
 
+def launch_interactive(args, policy, bundle, repo, config_dir, claude_real, claude_ver, claude_cmd, token, audit):
+    """Full Claude Code TUI inside the same sandbox and policy. Only run_start/run_end are audited:
+    per-action logging needs -p's stream-json output."""
+    claude = [claude_cmd, "--restricted", "--tools", ",".join(policy["tools"]),
+              "--permission-mode", "dontAsk", *guidance_flags(args, bundle), "--model", args.model]
+    if policy["filesystem"]["workspace"] == "read-only":
+        claude += ["--add-dir", str(repo)]
+    if policy["subagents"]:
+        claude += ["--agents", json.dumps(policy["subagents"])]
+    if args.prompt:
+        claude += ["--", args.prompt]
+    audit.write("run_start", profile=policy["profileId"], rev=policy["rev"], bundle=str(bundle),
+                harness=claude_ver, workspace=str(repo), interactive=True, redteam=args.redteam)
+    print(c(f"== {policy['profileId']}  ·  repo {policy['filesystem']['workspace']}  ·  "
+            f"toolbox: {', '.join(policy['packages'])}  ·  interactive", BOLD))
+    print(c("== sandbox + policy enforced as usual; audit log records start/end only in interactive mode", DIM))
+    rc = subprocess.call(bwrap_argv(policy, bundle, repo, config_dir, claude_real, token,
+                                    interactive=True) + ["--"] + claude)
+    audit.write("run_end", exit_code=rc, interactive=True)
+    return rc
+
+
 def cmd_launch(args):
     bundle = resolve_bundle(args)
     policy = load_policy(bundle)
@@ -371,6 +396,10 @@ def cmd_launch(args):
     run_id = dt.datetime.now().strftime("%Y%m%dT%H%M%S") + "-" + uuid.uuid4().hex[:6]
     config_dir = new_config_dir(run_id)
     audit = Audit(policy, run_id, redteam=args.redteam)
+
+    if args.interactive:
+        return launch_interactive(args, policy, bundle, repo, config_dir, claude_real, claude_ver,
+                                  claude_cmd, token, audit)
 
     claude = [claude_cmd, "--restricted", "-p", "--output-format", "stream-json", "--verbose",
               "--tools", ",".join(policy["tools"]),
@@ -568,9 +597,11 @@ def main():
     sp.add_argument("--repo", required=True, help="workspace directory")
     sp.add_argument("--model", default="haiku")
     sp.add_argument("--budget", type=float, default=0.5, help="max USD for this run")
+    sp.add_argument("--interactive", "-i", action="store_true",
+                    help="open the full Claude Code interface inside the profile sandbox")
     sp.add_argument("--redteam", action="store_true",
                     help="drop behaviour guidance/skills to test enforcement against a non-compliant agent")
-    sp.add_argument("words", nargs="+", metavar="[profile] prompt")
+    sp.add_argument("words", nargs="*", metavar="[profile] prompt")
     sp.set_defaults(fn=cmd_launch)
 
     sp = sub.add_parser("probe", help="LLM-free enforcement checks in the profile sandbox")
@@ -595,10 +626,12 @@ def main():
         ap.error(f"unrecognized arguments: {' '.join(extra)}")
     if args.cmd == "launch":
         args.words += extra
+        if not args.bundle and not args.words:
+            die("give a profile name, e.g. agentctl launch developer --repo . --interactive")
         words = args.words if args.bundle else args.words[1:]
         args.profile = None if args.bundle else args.words[0]
-        if not words:
-            die("launch needs a prompt")
+        if not words and not args.interactive:
+            die("launch needs a prompt (or --interactive)")
         args.prompt = " ".join(words)
     if getattr(args, "profile", None) is None and not getattr(args, "bundle", None) and args.cmd in ("inspect", "probe"):
         die("give a profile name or --bundle")
