@@ -146,7 +146,7 @@ prep() {
   fi
   for ref in "$FLAKE#agentctl" "$FLAKE#reviewer" "$FLAKE#developer" \
              "$(tagref v1.0.0)#reviewer" "$(tagref v1.1.0)#reviewer"; do
-    nix build --no-link "$ref" 2>/dev/null && printf '%s✔%s %s\n' "$G" "$N" "$ref" \
+    nix build --refresh --no-link "$ref" 2>/dev/null && printf '%s✔%s %s\n' "$G" "$N" "$ref" \
       || { printf '%s✘ %s%s\n' "$R" "$ref" "$N"; exit 1; }
   done
   reset_repo
