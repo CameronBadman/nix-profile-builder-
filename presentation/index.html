@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agents, versioned like code</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --line: #30363d; --fg: #e6edf3; --dim: #8b949e;
+    --green: #3fb950; --red: #f85149; --yellow: #d29922; --blue: #58a6ff; --violet: #bc8cff;
+    --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+    --sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font-family: var(--sans); }
+  body { overflow: hidden; }
+  .slide {
+    position: absolute; inset: 0; padding: 6vh 7vw 9vh; display: flex; flex-direction: column;
+    justify-content: center; gap: 2.4vh; opacity: 0; pointer-events: none; transform: translateX(3vw);
+    transition: opacity .35s ease, transform .35s ease;
+  }
+  .slide.active { opacity: 1; pointer-events: auto; transform: none; }
+  .slide.past { transform: translateX(-3vw); }
+  .kicker { font: 600 clamp(12px, 1.4vw, 18px) var(--mono); color: var(--green); letter-spacing: .08em; text-transform: uppercase; }
+  h1 { font-size: clamp(36px, 6.4vw, 92px); line-height: 1.02; margin: 0; letter-spacing: -.03em; }
+  h2 { font-size: clamp(28px, 4.2vw, 60px); line-height: 1.08; margin: 0; letter-spacing: -.02em; }
+  p, li { font-size: clamp(16px, 2vw, 28px); line-height: 1.45; color: var(--fg); margin: 0; }
+  .dim { color: var(--dim); }
+  .g { color: var(--green); } .r { color: var(--red); } .y { color: var(--yellow); } .b { color: var(--blue); } .v { color: var(--violet); }
+  ul { margin: 0; padding-left: 1.2em; display: grid; gap: 1.2vh; }
+  .term {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 2.2vh 2vw;
+    font: clamp(12px, 1.35vw, 19px)/1.55 var(--mono); white-space: pre; overflow-x: auto; max-width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  }
+  .term .cmd { color: var(--yellow); }
+  .term .cmd::before { content: "$ "; color: var(--dim); }
+  .big-cmd { font: 600 clamp(16px, 2.3vw, 34px) var(--mono); color: var(--fg); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 12px; padding: 2vh 2vw; overflow-x: auto; white-space: nowrap; }
+  .big-cmd .h { color: var(--green); }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 3vw; align-items: start; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 2.4vh 1.8vw; display: grid; gap: 1.2vh; }
+  .card h3 { margin: 0; font-size: clamp(18px, 2.2vw, 30px); }
+  .pill { display: inline-block; font: 600 clamp(11px, 1.1vw, 15px) var(--mono); padding: .25em .7em; border-radius: 999px; border: 1px solid currentColor; }
+  table { border-collapse: collapse; width: 100%; font-size: clamp(14px, 1.7vw, 24px); }
+  td, th { text-align: left; padding: 1.1vh 1vw; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; font-size: .8em; text-transform: uppercase; letter-spacing: .06em; }
+  .wow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2vw; }
+  .wow .n { font: 700 clamp(28px, 4vw, 56px) var(--mono); color: var(--green); }
+  svg { width: 100%; height: auto; max-height: 58vh; }
+  svg text { font-family: var(--mono); fill: var(--fg); }
+  .footer { position: fixed; left: 7vw; right: 7vw; bottom: 3vh; display: flex; justify-content: space-between;
+    font: clamp(11px, 1vw, 14px) var(--mono); color: var(--dim); z-index: 2; }
+  .progress { position: fixed; left: 0; top: 0; height: 3px; background: var(--green); transition: width .35s ease; z-index: 3; }
+  .hint { opacity: .7; }
+  @media (max-width: 760px) {
+    .cols, .wow { grid-template-columns: 1fr; }
+    .slide { padding: 5vh 16px 10vh; justify-content: flex-start; overflow-y: auto; }
+    .footer { left: 16px; right: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+
+<!-- 1 -->
+<section class="slide">
+  <div class="kicker">Hackday · ACME agent profiles</div>
+  <h1>Agents,<br>versioned like code.</h1>
+  <p class="dim">A company defines an agent once (tools, permissions, skills, standards), publishes it to GitHub, and anyone launches the exact same agent with one command.</p>
+  <div class="big-cmd"><span class="dim">$ </span>nix run <span class="h">github:CameronBadman/nix-profile-builder-#reviewer</span></div>
+</section>
+
+<!-- 2 -->
+<section class="slide">
+  <div class="kicker">The problem</div>
+  <h2>Every developer's agent is a snowflake.</h2>
+  <ul>
+    <li>Different tool versions, different MCPs, different <span class="y">CLAUDE.md</span> files on every laptop.</li>
+    <li>Permissions are "whatever I clicked yes to last week".</li>
+    <li>Company review & coding standards live in a wiki the agent never reads.</li>
+    <li>When something goes wrong: <span class="r">no idea which setup the agent was running.</span></li>
+  </ul>
+</section>
+
+<!-- 3 -->
+<section class="slide">
+  <div class="kicker">The idea</div>
+  <h2>One name = the whole setup.</h2>
+  <div class="cols">
+    <div class="term"><span class="dim"># profiles/reviewer.nix</span>
+{
+  name    = <span class="g">"reviewer"</span>;
+  version = <span class="g">"1.1.0"</span>;
+  packages = [ <span class="g">"ripgrep" "git" "shellcheck"</span> ];
+  filesystem.workspace = <span class="g">"read-only"</span>;
+  network.tools        = <span class="g">"deny"</span>;
+  tools  = [ <span class="g">"Read" "Grep" "Glob"</span>
+             <span class="g">"Bash" "Skill" "Agent"</span> ];
+  skills = [ <span class="g">"acme-code-review"</span> ];
+  behaviour.standards = [ <span class="g">"review"</span> ];
+  subagents.security-auditor = { <span class="dim">…</span> };
+}</div>
+    <div class="card">
+      <h3>What you get</h3>
+      <p><span class="b">Tools</span> pinned by Nix, and <b>Claude Code itself</b> too (2.1.293).</p>
+      <p><span class="r">Permissions</span> enforced by the kernel sandbox + harness.</p>
+      <p><span class="v">Skills & standards</span> loaded as agent instructions.</p>
+      <p><span class="g">Versions</span> = git tags. Distribution = GitHub. No server.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4 -->
+<section class="slide">
+  <div class="kicker">How it works</div>
+  <h2>A launch, end to end.</h2>
+  <svg viewBox="0 0 1200 430" role="img" aria-label="Architecture: GitHub flake builds a read-only Nix store bundle; agentctl launches pinned Claude Code inside a bubblewrap sandbox and writes the audit log from outside">
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/></marker>
+    </defs>
+    <!-- github -->
+    <rect x="20" y="40" width="250" height="110" rx="12" fill="#161b22" stroke="#30363d"/>
+    <text x="40" y="80" font-size="20" font-weight="700">GitHub flake</text>
+    <text x="40" y="108" font-size="15" fill="#8b949e">profiles/*.nix · skills/</text>
+    <text x="40" y="130" font-size="15" fill="#8b949e">tags v1.0.0, v1.1.0</text>
+    <!-- store -->
+    <rect x="20" y="230" width="250" height="160" rx="12" fill="#161b22" stroke="#3fb950"/>
+    <text x="40" y="268" font-size="20" font-weight="700" fill="#3fb950">/nix/store bundle</text>
+    <text x="40" y="296" font-size="15" fill="#8b949e">managed-settings.json</text>
+    <text x="40" y="318" font-size="15" fill="#8b949e">skills · behaviour.md</text>
+    <text x="40" y="340" font-size="15" fill="#8b949e">tool env · claude-code</text>
+    <text x="40" y="370" font-size="14" fill="#3fb950">read-only by construction</text>
+    <line x1="145" y1="150" x2="145" y2="226" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
+    <text x="155" y="195" font-size="14" fill="#8b949e">nix build</text>
+    <!-- sandbox -->
+    <rect x="360" y="20" width="560" height="390" rx="16" fill="none" stroke="#f85149" stroke-width="2" stroke-dasharray="8 6"/>
+    <text x="380" y="52" font-size="17" font-weight="700" fill="#f85149">bubblewrap sandbox (kernel)</text>
+    <text x="380" y="76" font-size="14" fill="#8b949e">repo ro / rw · $HOME hidden · policy mounted read-only</text>
+    <rect x="400" y="100" width="480" height="150" rx="12" fill="#161b22" stroke="#30363d"/>
+    <text x="420" y="136" font-size="19" font-weight="700">Claude Code 2.1.293 (pinned)</text>
+    <text x="420" y="162" font-size="15" fill="#8b949e">--restricted · managed settings · --tools</text>
+    <text x="420" y="186" font-size="15" fill="#8b949e">skills + standards as instructions</text>
+    <rect x="420" y="200" width="200" height="36" rx="8" fill="#0d1117" stroke="#bc8cff"/>
+    <text x="434" y="224" font-size="14" fill="#bc8cff">subagents (same box)</text>
+    <rect x="400" y="280" width="480" height="100" rx="12" fill="#161b22" stroke="#30363d"/>
+    <text x="420" y="314" font-size="17" font-weight="700">Bash → Claude's own sandbox</text>
+    <text x="420" y="340" font-size="15" fill="#8b949e">nested bwrap · no network for tools</text>
+    <text x="420" y="362" font-size="15" fill="#8b949e">writes still hit the outer read-only mount</text>
+    <line x1="274" y1="300" x2="396" y2="200" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
+    <!-- launcher + log -->
+    <rect x="975" y="100" width="205" height="110" rx="12" fill="#161b22" stroke="#30363d"/>
+    <text x="993" y="140" font-size="19" font-weight="700">agentctl</text>
+    <text x="993" y="166" font-size="14" fill="#8b949e">builds the box,</text>
+    <text x="993" y="186" font-size="14" fill="#8b949e">reads stream-json</text>
+    <rect x="975" y="270" width="205" height="110" rx="12" fill="#161b22" stroke="#d29922"/>
+    <text x="993" y="310" font-size="19" font-weight="700" fill="#d29922">audit log</text>
+    <text x="993" y="336" font-size="14" fill="#8b949e">outside the box:</text>
+    <text x="993" y="356" font-size="14" fill="#8b949e">rev + every action</text>
+    <line x1="971" y1="160" x2="884" y2="170" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
+    <line x1="1077" y1="210" x2="1077" y2="266" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
+  </svg>
+</section>
+
+<!-- 5 -->
+<section class="slide">
+  <div class="kicker">Three things to watch for</div>
+  <h2>The demo in one slide.</h2>
+  <div class="wow">
+    <div class="card"><div class="n">01</div><h3>An agent from a URL</h3><p class="dim">Nothing installed. Nix fetches tools, skills, policy and Claude Code from GitHub.</p></div>
+    <div class="card"><div class="n">02</div><h3>Upgrade = git tag</h3><p class="dim">Diff two published versions of an agent like a pull request.</p></div>
+    <div class="card"><div class="n">03</div><h3>The kernel says no</h3><p class="dim">Tell the agent to break the rules. It tries. It can't.</p></div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section class="slide">
+  <div class="kicker">01 · An agent from a URL</div>
+  <h2>The registry is a GitHub repo.</h2>
+  <div class="term"><span class="cmd">nix run github:CameronBadman/nix-profile-builder-#agentctl -- list</span>
+<b>Profile registry</b> <span class="dim">(flake rev df7669500036)</span>
+  <span class="g">developer@1.0.0</span>   read-write  tools=Read,Grep,Glob,Edit,Write,Bash,TodoWrite,Skill
+                    <span class="dim">Implementation agent with workspace write access and ACME coding standards</span>
+  <span class="g">reviewer@1.1.0</span>    read-only   tools=Read,Grep,Glob,Bash,Skill,Agent
+                    <span class="dim">Read-only code reviewer applying ACME review standards</span>
+
+<span class="cmd">nix run github:CameronBadman/nix-profile-builder-#reviewer -- --repo . "Review calc.py"</span>
+<b>== reviewer@1.1.0  rev df7669500036  harness 2.1.293 (Claude Code) [pinned nixpkgs]</b>
+[init] profile skills=<span class="g">['profile-reviewer:acme-code-review']</span>
+<b>[agent]</b> ACME-REVIEW:
+  <span class="dim">… security-auditor subagent: calc.py:15 · CWE-369 (Divide by Zero) …</span>
+  VERDICT: APPROVE</div>
+</section>
+
+<!-- 7 -->
+<section class="slide">
+  <div class="kicker">02 · Upgrade = git tag</div>
+  <h2>Review an agent change like a code change.</h2>
+  <div class="term"><span class="cmd">agentctl diff …/v1.0.0#reviewer …/v1.1.0#reviewer --text</span>
+<span class="r">--- v1.0.0#reviewer  (reviewer@1.0.0, rev 60d9d928dadd)</span>
+<span class="g">+++ v1.1.0#reviewer  (reviewer@1.1.0, rev c1b3b5c934d0)</span>
+  version           <span class="r">1.0.0</span> -&gt; <span class="g">1.1.0</span>
+  <span class="dim">harness           claude-code-2.1.293</span>
+  packages          <span class="g">+shellcheck-0.11.0-bin</span> <span class="dim">git-2.55.0 ripgrep-15.2.0</span>
+  <span class="dim">tools             Read, Grep, Glob, Bash, Skill, Agent</span>
+
+<span class="r">-  Security issues … are always BLOCKER.</span>
+<span class="g">+  Security issues … are always BLOCKER and must cite a CWE id (e.g. CWE-89).</span>
+<span class="r">-4. Security. Check input validation, injection, secrets …</span>
+<span class="g">+4. Security. Delegate a focused security pass to the security-auditor subagent …</span></div>
+  <p class="dim">Pin a team to <span class="y">github:…/v1.0.0#reviewer</span> while you trial v1.1.0, and roll back by changing a tag.</p>
+</section>
+
+<!-- 8 -->
+<section class="slide">
+  <div class="kicker">03 · The kernel says no</div>
+  <h2>Instructions off. Sandbox on.</h2>
+  <div class="term"><span class="cmd">nix run …#reviewer -- --redteam --repo . "echo >> calc.py; sed -i …; rm test_calc.py"</span>
+<span class="y">== REDTEAM: behaviour guidance + skills dropped; enforcement unchanged</span>
+<span class="r">[BLOCKED]</span> Bash: /tmp/acme-calc/calc.py: <span class="r">Read-only file system</span>
+<span class="r">[BLOCKED]</span> Bash: sed: couldn't open temporary file …: <span class="r">Read-only file system</span>
+<span class="r">[BLOCKED]</span> Bash: rm: cannot remove '…/test_calc.py': <span class="r">Read-only file system</span>
+<b>== done:</b> <span class="g">allowed=0</span> <span class="r">blocked=3</span>  profile=reviewer@1.1.0
+<span class="g">✔ repository untouched</span>  (git status clean)</div>
+  <p class="dim">The agent can't edit its own policy either: it lives in the read-only Nix store, mounted read-only where Claude Code reads managed settings.</p>
+</section>
+
+<!-- 9 -->
+<section class="slide">
+  <div class="kicker">Same repo, different profile</div>
+  <h2>Swap the name, swap the agent.</h2>
+  <div class="cols">
+    <div class="card">
+      <span class="pill r">reviewer@1.1.0</span>
+      <p>read-only repo · git, ripgrep, shellcheck</p>
+      <p>skill <span class="g">acme-code-review</span> · review standards</p>
+      <p>security-auditor subagent</p>
+      <p class="g">✔ repository untouched</p>
+    </div>
+    <div class="card">
+      <span class="pill g">developer@1.0.0</span>
+      <p>workspace write · python3, ruff, git, ripgrep</p>
+      <p>skill <span class="g">acme-implement-feature</span> · coding standards</p>
+      <p>Bash network blocked by nested sandbox</p>
+      <p class="y">✎ fixed average([]), added test, tests + ruff pass</p>
+    </div>
+  </div>
+</section>
+
+<!-- 10 -->
+<section class="slide">
+  <div class="kicker">What's real</div>
+  <h2>Enforced vs. guidance, shown in <span class="y">inspect</span>.</h2>
+  <div style="overflow-x:auto">
+  <table>
+    <tr><th>Control</th><th>Enforced by</th></tr>
+    <tr><td>Repo read-only / writable, home hidden</td><td class="g">Kernel (bubblewrap mounts)</td></tr>
+    <tr><td>Policy, skills, settings immutable</td><td class="g">Kernel (read-only /nix/store)</td></tr>
+    <tr><td>Tool set, no web tools</td><td class="b">Claude Code managed settings + --restricted</td></tr>
+    <tr><td>Tool network</td><td class="b">Claude Code sandbox, nested in ours</td></tr>
+    <tr><td>Unsupported (e.g. domain allowlists)</td><td class="r">Rejected at build time, never faked</td></tr>
+    <tr><td>Skills & company standards</td><td class="y">Guidance: shapes behaviour, not guaranteed</td></tr>
+  </table>
+  </div>
+</section>
+
+<!-- 11 -->
+<section class="slide">
+  <div class="kicker">Live</div>
+  <h1><span class="g">./demo.sh</span></h1>
+  <p class="dim">Registry → inspect → upgrade → sandbox probe → reviewer → red team → developer → audit log.</p>
+  <div class="cols">
+    <div class="card"><h3>Built tonight</h3>
+      <p class="dim">Nix flake + validation · bubblewrap launcher · pinned Claude Code · skills as plugins · subagents · audit log · tag diffs · 12 no-cost tests</p></div>
+    <div class="card"><h3>Next</h3>
+      <p class="dim">Egress proxy for domain allowlists · signed profile releases · more harnesses (same schema) · macOS sandbox</p></div>
+  </div>
+  <p class="dim" style="font-size:clamp(13px,1.3vw,18px)">github.com/CameronBadman/nix-profile-builder-</p>
+</section>
+
+<div class="footer"><span>ACME agent profiles</span><span class="hint">← → / space · <span id="count"></span></span></div>
+
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  const progress = document.getElementById('progress');
+  const count = document.getElementById('count');
+  let i = 0;
+  function readHash() {
+    const n = parseInt(location.hash.slice(1), 10);
+    return Number.isFinite(n) ? Math.min(Math.max(n - 1, 0), slides.length - 1) : 0;
+  }
+  function show(n) {
+    i = Math.min(Math.max(n, 0), slides.length - 1);
+    slides.forEach((s, k) => {
+      s.classList.toggle('active', k === i);
+      s.classList.toggle('past', k < i);
+    });
+    progress.style.width = ((i + 1) / slides.length * 100) + '%';
+    count.textContent = (i + 1) + ' / ' + slides.length;
+    if (location.hash !== '#' + (i + 1)) history.replaceState(null, '', '#' + (i + 1));
+  }
+  document.addEventListener('keydown', e => {
+    if (['ArrowRight', 'PageDown', ' ', 'Enter'].includes(e.key)) { e.preventDefault(); show(i + 1); }
+    if (['ArrowLeft', 'PageUp', 'Backspace'].includes(e.key)) { e.preventDefault(); show(i - 1); }
+    if (e.key === 'Home') show(0);
+    if (e.key === 'End') show(slides.length - 1);
+  });
+  document.addEventListener('click', e => {
+    if (e.target.closest('a, .term, table')) return;
+    show(e.clientX > innerWidth / 3 ? i + 1 : i - 1);
+  });
+  let tx = null;
+  document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
+  document.addEventListener('touchend', e => {
+    if (tx === null) return;
+    const dx = e.changedTouches[0].clientX - tx;
+    if (Math.abs(dx) > 40) show(dx < 0 ? i + 1 : i - 1);
+    tx = null;
+  });
+  window.addEventListener('hashchange', () => show(readHash()));
+  show(readHash());
+</script>
+</body>
+</html>

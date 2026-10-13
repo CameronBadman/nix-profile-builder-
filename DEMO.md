@@ -13,6 +13,7 @@ permissions, skills and sandbox, versioned like code and run straight from GitHu
 - [ ] `./demo.sh prep`: prefetches every flake ref, checks bubblewrap + OAuth token. Wait for **`Ready.`**
 - [ ] Bump the font size. Terminal **≥ 120 cols** (inspect/diff lines are wide)
 - [ ] Wifi up (the model API + GitHub fetch need it)
+- [ ] Slides: `xdg-open presentation/index.html` (offline, ← → to navigate, F11 fullscreen; `#7` in the URL jumps to slide 7)
 - [ ] Fallback if the network dies: `less -R demo/recorded-run.txt` (colour recording of a full good run)
 - Press ⏎ between acts. `NO_PAUSE=1` runs it straight through.
 
