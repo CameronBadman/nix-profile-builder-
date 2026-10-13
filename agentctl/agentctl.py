@@ -16,6 +16,7 @@ import uuid
 from pathlib import Path
 
 STATE = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "agent-profiles"
+TOKEN_FILE = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "agent-profiles" / "oauth-token"
 DEFAULT_FLAKE = os.environ.get("AGENT_PROFILES_FLAKE", ".")
 SANDBOX_HOME = "/home/agent"
 CONFIG_DIR = f"{SANDBOX_HOME}/.claude-profile"
@@ -224,9 +225,12 @@ def cmd_launch(args):
     if not repo.is_dir():
         die(f"workspace {repo} is not a directory")
     token = os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")
+    if not token and TOKEN_FILE.exists():
+        token = TOKEN_FILE.read_text().strip()
     if not token:
-        die("CLAUDE_CODE_OAUTH_TOKEN is not set (run `claude setup-token` once and export it); "
-            "the host ~/.claude login is deliberately not exposed to the sandbox")
+        die(f"no OAuth token: export CLAUDE_CODE_OAUTH_TOKEN or write it to {TOKEN_FILE} "
+            "(get one with `claude setup-token`); the host ~/.claude login is deliberately "
+            "not exposed to the sandbox")
     claude_real, claude_ver = host_claude()
     run_id = dt.datetime.now().strftime("%Y%m%dT%H%M%S") + "-" + uuid.uuid4().hex[:6]
     config_dir = new_config_dir(run_id)
