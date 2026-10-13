@@ -206,6 +206,8 @@ case "${1:-all}" in
       by="by the OS"; [ "${RT_POLICY:-0}" -gt 0 ] && by="(OS $((RT_BLOCKED - RT_POLICY)), Claude Code policy $RT_POLICY)"
       if [ "${RT_BLOCKED:-0}" -ge 5 ]; then
         printf '%s✔ reviewer: instructions deleted, %s attempts blocked %s, repository untouched%s\n' "$G" "$RT_BLOCKED" "$by" "$N"
+      elif [ "${RT_BLOCKED:-0}" -eq 0 ]; then
+        printf '%s• reviewer: refused all 5 commands, repository untouched%s\n' "$Y" "$N"
       else
         printf '%s• reviewer: attempted %s of 5, all blocked %s, repository untouched%s\n' "$Y" "$RT_BLOCKED" "$by" "$N"
       fi
