@@ -16,7 +16,7 @@ let
   sandboxDeps = lib.optionals bashSandbox [ pkgs.bubblewrap pkgs.socat pkgs.ripgrep ];
   env = pkgs.buildEnv {
     name = "agent-${p.name}-env";
-    paths = map resolvePkg p.packages ++ [ pkgs.bashInteractive pkgs.coreutils ] ++ sandboxDeps;
+    paths = map resolvePkg p.packages ++ [ pkgs.bashInteractive pkgs.coreutils pkgs.gnused pkgs.gnugrep pkgs.findutils ] ++ sandboxDeps;
     ignoreCollisions = true;
   };
 
@@ -81,13 +81,15 @@ pkgs.runCommand "agent-${p.name}-${p.version}" {
   inherit behaviourMd;
   passAsFile = [ "policyJson" "settingsJson" "agentsJson" "behaviourMd" ];
 } ''
-  mkdir -p $out/skills $out/bin
+  mkdir -p $out/plugin/.claude-plugin $out/plugin/skills $out/bin
+  ln -s plugin/skills $out/skills
+  echo '{"name":"profile-${p.name}","version":"${p.version}","description":"Approved skills for agent profile ${p.name}"}' > $out/plugin/.claude-plugin/plugin.json
   cp $policyJsonPath $out/policy.json
   cp $settingsJsonPath $out/managed-settings.json
   cp $agentsJsonPath $out/agents.json
   cp $behaviourMdPath $out/behaviour.md
   ln -s ${env} $out/env
-  ${lib.concatMapStrings (s: "cp -r ${skillsDir + "/${s}"} $out/skills/${s}\n") p.skills}
+  ${lib.concatMapStrings (s: "cp -r ${skillsDir + "/${s}"} $out/plugin/skills/${s}\n") p.skills}
   cat > $out/bin/${p.name} <<EOF
   #!${pkgs.runtimeShell}
   exec ${agentctl}/bin/agentctl launch --bundle $out "\$@"

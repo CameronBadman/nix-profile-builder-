@@ -5,8 +5,8 @@
   packages = [ "ripgrep" "git" ];
   filesystem.workspace = "read-only";
   network.tools = "deny";
-  tools = [ "Read" "Grep" "Glob" "Skill" "Agent" ];
-  skills = [ "code-review" ];
+  tools = [ "Read" "Grep" "Glob" "Bash" "Skill" "Agent" ];
+  skills = [ "acme-code-review" ];
   behaviour = {
     standards = [ "review" ];
     notes = "You are a reviewer. Never modify repository files; report findings only.";

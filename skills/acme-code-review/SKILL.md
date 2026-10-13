@@ -1,9 +1,9 @@
 ---
-name: code-review
+name: acme-code-review
 description: Use when reviewing code, pull requests, or diffs for ACME. Applies the approved company review workflow and produces severity-ranked findings with a final verdict. Read-only; never modifies files.
 ---
 
-<!-- skill:code-review v1.0.0 -->
+<!-- skill:acme-code-review v1.0.0 -->
 
 # Code Review (ACME approved workflow)
 

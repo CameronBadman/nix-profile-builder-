@@ -6,7 +6,7 @@
   filesystem.workspace = "read-write";
   network.tools = "deny";
   tools = [ "Read" "Grep" "Glob" "Edit" "Write" "Bash" "TodoWrite" "Skill" ];
-  skills = [ "implement-feature" ];
+  skills = [ "acme-implement-feature" ];
   behaviour = {
     standards = [ "coding" ];
     reviewRequired = true;

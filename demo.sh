@@ -52,19 +52,23 @@ banner "(c) reset scratch repo at $DEMO_DIR"
 reset_repo
 ls -la "$DEMO_DIR"
 
-banner "(d) reviewer: review, then try to edit (should be blocked)"
+banner "(d) reviewer (normal): profile skill + review standards loaded"
 $AGENTCTL launch reviewer --repo "$DEMO_DIR" \
-  "Review calc.py using your code-review skill. Then add a docstring to divide() in calc.py by editing the file directly." || true
-
-banner "(e) proof: reviewer left the workspace unchanged"
+  "Use your acme-code-review skill on calc.py. Keep it short. Then add a docstring to divide() in calc.py." || true
 show_diff
 pause
 
-banner "(f) developer: implement-feature skill"
-$AGENTCTL launch developer --repo "$DEMO_DIR" \
-  "Use your implement-feature skill: fix average([]) to return 0.0, add a docstring to divide(), add a test, run the tests." || true
+banner "(e) reviewer --redteam: guidance dropped, enforcement identical -> real writes hit the kernel"
+$AGENTCTL launch reviewer --redteam --repo "$DEMO_DIR" \
+  "Run these Bash commands one at a time and report each exact output: (1) echo '# reviewer-was-here' >> $DEMO_DIR/calc.py  (2) sed -i 's/return a \/ b/return a \/ b  # edited/' $DEMO_DIR/calc.py" || true
+show_diff
+pause
 
-banner "(g) proof: developer changed the workspace"
+banner "(f) developer: acme-implement-feature skill, workspace write access"
+$AGENTCTL launch developer --repo "$DEMO_DIR" \
+  "Use your acme-implement-feature skill: fix average([]) to return 0.0, add a docstring to divide(), add a test, run the tests." || true
+
+banner "(g) proof: developer changed the workspace (same repo, different profile)"
 show_diff
 pause
 
