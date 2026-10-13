@@ -220,7 +220,11 @@ class Audit:
         self.f.flush()
         return rec
 
-    def say(self, msg):
+    def say(self, msg, width=160):
+        # one line per event; agent prose is printed in full
+        if not msg.startswith(c("[agent]", BOLD)):
+            msg = " ⏎ ".join(l.strip() for l in msg.splitlines() if l.strip())
+            msg = msg if len(msg) <= width else msg[:width] + "…"
         print(msg, flush=True)
 
     def handle(self, m):
@@ -420,7 +424,7 @@ def cmd_diff(args):
     for field, get in DIFF_FIELDS:
         va, vb = get(pa), get(pb)
         if va == vb:
-            print(c(f"  {field:<17} {va}", DIM))
+            print(c(f"  {field:<17} {', '.join(map(str, va)) if isinstance(va, list) else va}", DIM))
         elif isinstance(va, list) and isinstance(vb, list):
             gone = [x for x in va if x not in vb]
             new = [x for x in vb if x not in va]
