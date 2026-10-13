@@ -242,6 +242,7 @@ class Audit:
     def __init__(self, policy, run_id, redteam=False):
         self.redteam = redteam
         self.hidden = 0
+        self.denied = set()
         (STATE / "logs").mkdir(parents=True, exist_ok=True)
         self.path = STATE / "logs" / f"{run_id}-{policy['name']}.jsonl"
         self.f = self.path.open("a")
@@ -285,7 +286,14 @@ class Audit:
         elif t == "system" and m.get("subtype") == "permission_denied":
             self.counts["blocked"] += 1
             self.write("blocked", layer="harness", detail=m)
-            self.say(f"[{c('BLOCKED by harness', RED)}] {m.get('tool_name')}: {m.get('decision_reason', '')[:160]}")
+            if COMPACT:
+                self.denied.add(m.get("tool_use_id"))
+                req = self.pending.get(m.get("tool_use_id"), {})
+                reason = (m.get("decision_reason") or "").split(": ", 1)[-1]
+                self.say(f"[{c('BLOCKED', RED)}] {m.get('tool_name'):<5} {summarize(req.get('input'))}"
+                         f"  →  {c('Claude Code policy: ' + reason[:50], RED)}")
+            else:
+                self.say(f"[{c('BLOCKED by harness', RED)}] {m.get('tool_name')}: {m.get('decision_reason', '')[:160]}")
         elif t == "assistant":
             for b in m.get("message", {}).get("content", []):
                 if b.get("type") == "tool_use":
@@ -306,6 +314,9 @@ class Audit:
             for b in content if isinstance(content, list) else []:
                 if b.get("type") != "tool_result":
                     continue
+                if COMPACT and b.get("tool_use_id") in self.denied:
+                    self.pending.pop(b.get("tool_use_id"), None)
+                    continue  # already shown as a harness denial
                 req = self.pending.pop(b.get("tool_use_id"), {})
                 text = b.get("content")
                 if isinstance(text, list):
@@ -337,7 +348,7 @@ class Audit:
             self.write("result", permission_denials=m.get("permission_denials"),
                        cost_usd=m.get("total_cost_usd"), is_error=m.get("is_error"),
                        num_turns=m.get("num_turns"), result=m.get("result"))
-            for d in m.get("permission_denials") or []:
+            for d in (m.get("permission_denials") or []) if not COMPACT else []:
                 self.say(f"[denial] {json.dumps(d)[:200]}")
             if not COMPACT:
                 self.say(f"[result] cost=${m.get('total_cost_usd')} turns={m.get('num_turns')}")
