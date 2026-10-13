@@ -84,14 +84,32 @@ def load_policy(bundle):
     return policy
 
 
+# --restricted arrived in 2.1.248, --permission-prompts in 2.1.259 (code.claude.com/docs/en/cli-reference).
+MIN_HARNESS = (2, 1, 259)
+
+
+def check_harness_version(ver, where):
+    import re
+    m = re.match(r"(\d+)\.(\d+)\.(\d+)", ver or "")
+    if not m:
+        die(f"cannot determine Claude Code version from {where} (got {ver!r}); refusing to launch")
+    found = tuple(map(int, m.groups()))
+    if found < MIN_HARNESS:
+        need = ".".join(map(str, MIN_HARNESS))
+        die(f"Claude Code {m.group(0)} at {where} is too old: this launcher relies on --restricted "
+            f"and --permission-prompts (need >= {need}). Use harness = \"nixpkgs\" or update claude.")
+
+
 def resolve_harness(policy):
     """Pinned nixpkgs claude-code (lives in /nix/store, already visible read-only in the
     sandbox) or the host binary (bind-mounted read-only)."""
     if policy.get("harnessPath"):
         path = policy["harnessPath"]
         ver = subprocess.run([path, "--version"], capture_output=True, text=True).stdout.strip()
+        check_harness_version(ver, path)
         return None, f"{ver} [pinned nixpkgs]", path
     real, ver = host_claude()
+    check_harness_version(ver, real)
     return real, f"{ver} [host, unpinned]", CLAUDE_IN_SANDBOX
 
 

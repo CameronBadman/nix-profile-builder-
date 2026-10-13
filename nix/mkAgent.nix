@@ -4,6 +4,10 @@
 
 let
   p = profile;
+  # --restricted (2.1.248) and --permission-prompts (2.1.259) are required by the launcher.
+  minHarness = "2.1.259";
+  pinnedOk = lib.versionAtLeast pkgs.claude-code.version minHarness
+    || throw "profile '${p.name}': pinned claude-code ${pkgs.claude-code.version} is older than ${minHarness} (needs --restricted and --permission-prompts); update the nixpkgs input";
   hasBash = lib.elem "Bash" p.tools;
   rw = p.filesystem.workspace == "read-write";
   bashSandbox = hasBash && p.network.tools == "deny";
@@ -71,7 +75,8 @@ let
     envPath = "${env}";
     bwrap = "${pkgs.bubblewrap}/bin/bwrap";
     bashSandbox = bashSandbox;
-    harnessPath = if p.harness == "nixpkgs" then "${pkgs.claude-code}/bin/claude" else null;
+    harnessPath = if p.harness == "nixpkgs" then assert pinnedOk; "${pkgs.claude-code}/bin/claude" else null;
+    minHarness = minHarness;
     managedSettings = managedSettings;
     packagePaths = lib.genAttrs p.packages (n: "${resolvePkg n}");
   };

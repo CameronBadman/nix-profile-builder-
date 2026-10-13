@@ -25,7 +25,10 @@ nix run $G#agentctl -- logs --last
 ```
 
 Claude Code itself (`claude-code` from nixpkgs, 2.1.293) is pinned in `flake.lock`, along with
-every tool in each profile's environment. Set `harness = "host"` in a profile to use the host
+every tool in each profile's environment. The launcher needs Claude Code >= 2.1.259
+(`--restricted` arrived in 2.1.248, `--permission-prompts` in 2.1.259): the pinned version is
+checked at build time and the actual binary at launch, and an older one is refused with a clear
+error. Set `harness = "host"` in a profile to use the host
 binary instead (unpinned; version still logged).
 
 ## Demo
