@@ -33,7 +33,7 @@ B1 developer run · B2 red-team run · B3 upgrade diff · B4 registry · B5 how 
 ## Long version (if you get 5+ minutes)
 
 `./demo.sh` runs all eight acts (registry, inspect, upgrade, sandbox probe, reviewer, red team,
-developer, audit log). Full recording: `less -R demo/recorded-run.txt`.
+developer, audit log). Full recording: `less -R demo/recorded-run.txt`. Pitch recording: `less -R demo/recorded-pitch.txt`.
 
 ## Likely judge questions
 
