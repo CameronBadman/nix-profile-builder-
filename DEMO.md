@@ -16,9 +16,9 @@ limits, skills, standards), publishes it on GitHub, and everyone runs the exact 
 |---|---|---|---|
 | 0:00 | Slide 1 | "Your AI agent has a shell, your repo and your login. What stops it? A *please don't* prompt and an editable settings file. Last July, an agent deleted a production database. agentflake is for platform teams." (~40 words; let the slide carry the rest) | the red line |
 | 0:20 | Slide 2 | "One file defines the agent: its tools, what the OS lets it touch, the company's skills and standards. It lives on GitHub, so every release is a git tag, and an upgrade is a diff you can review like a pull request." | the code, then the diff strip |
-| 0:45 | Terminal | `./demo.sh pitch`. Act 1 runs while you talk: "Same repo, developer profile. It pulls straight from GitHub, can write, and has python and ruff." | `profile skills=[…acme-implement-feature]`, the `✎ repository changed` diff |
+| 0:45 | Terminal | `./demo.sh pitch`. Act 1 runs while you talk: "Same repo, developer profile. It pulls straight from GitHub, can write, and has python and ruff." | `skills: acme-implement-feature`, the `✎ repository changed` diff, then `✔ tests pass` |
 | 1:10 | Terminal, press ⏎ | "Now the reviewer. Red-team mode deletes its instructions, the *please don't* from slide 1. We even hand it the exact commands: edit the code, delete the tests, look for my SSH keys." | the `$` line |
-| 1:25 | Terminal | "It tried. Read-only file system, every time. Its world has no SSH keys and no credentials, so a Replit-style agent has nothing to reach production with. And it can't rewrite its own rules. The agent ignored its instructions; the OS didn't." | three red `Read-only file system`, then `hidden from the sandbox`, then the ✔ line |
+| 1:25 | Terminal | "It tried. Read-only file system, every time. Its world has no home folder: no SSH keys, no cloud logins. It can't rewrite its own rules either. The agent ignored its instructions; the OS didn't." | three red `Read-only file system`, then `hidden from the sandbox`, then the ✔ line |
 | 1:45 | Slide 3 | "Defined once, locked by the OS, versioned like code. Across ten red-team runs, zero writes got through. Platform teams: pilot it on one repo this week. The QR has the repo." | `0`, the ask, QR |
 | ~2:15 | done | | |
 

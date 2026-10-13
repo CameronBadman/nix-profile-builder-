@@ -275,7 +275,7 @@ class Audit:
                 mine = [s for s in m["skills"] if s.startswith("profile-")]
                 if COMPACT:
                     names = [x.split(":", 1)[-1] for x in mine]
-                    self.say(f"skills: {c(', '.join(names) or 'none (instructions deleted)', GREEN)}")
+                    self.say(f"skills: {c(', '.join(names), GREEN) if names else c('none (instructions deleted)', YELLOW)}")
                 else:
                     self.say(f"[init] profile skills={c(mine, GREEN)} (+{len(m['skills']) - len(mine)} built-in)")
             if m.get("plugin_errors"):

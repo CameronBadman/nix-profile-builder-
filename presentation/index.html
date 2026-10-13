@@ -55,8 +55,8 @@
   .stat .lbl { font-size: clamp(15px, 1.7vw, 24px); color: var(--dim); }
   .qr { width: clamp(120px, 15vw, 230px); aspect-ratio: 1; background: #fff; border-radius: 14px; padding: 10px; }
   .ask { font-size: clamp(20px, 2.5vw, 36px); color: var(--yellow); font-weight: 700; }
-  .try { font: 700 clamp(13px, 1.5vw, 22px) var(--mono); background: var(--panel); border: 1px solid var(--line);
-    border-radius: 12px; padding: 1.6vh 1.4vw; overflow-wrap: anywhere; }
+  .try { font: 700 clamp(11px, 1.3vw, 20px) var(--mono); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 1.6vh 1.4vw; white-space: nowrap; overflow: hidden; }
   .try .h { color: var(--green); }
   table { border-collapse: collapse; width: 100%; font-size: clamp(16px, 2vw, 28px); }
   td { padding: 1.4vh 1vw; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -79,7 +79,7 @@
 <section class="slide" data-tag="">
   <div class="brand">agentflake</div>
   <h1>AI agents,<br>versioned like code.</h1>
-  <p class="stakes">Today your AI agent has a shell, your repo and your login. <span class="r">What stops it? A prompt that says "please don't", and a settings file on each laptop that anyone can change.</span></p>
+  <p class="stakes">Today your AI agent has a shell, your repo and your login. <span class="r">What stops it? A prompt that says "please don't", and a settings file anyone can change.</span></p>
   <p class="incident">July 2025: an AI coding agent deleted a company's production database during a code freeze. <span class="dim">(Replit / SaaStr)</span></p>
   <p class="small dim">For platform teams rolling AI agents out to every developer.</p>
 </section>
@@ -99,7 +99,7 @@ network.tools = <span class="g">"deny"</span>;   <span class="mute"># web tools 
 skills = [ <span class="g">"acme-code-review"</span> ];
 behaviour.standards = [ <span class="g">"review"</span> ];</div>
     <div class="stack">
-      <p><b class="r">Locked by the OS:</b> <span class="dim">repo, home folder and its own rules</span></p>
+      <p><b class="r">Locked by the OS:</b> <span class="dim">the reviewer's repo, the home folder, its own rules</span></p>
       <p><b class="v">Company skills &amp; standards</b> <span class="dim">included</span></p>
       <p><b class="g">Versioned by git:</b> <span class="dim">every release is a tag you can diff</span></p>
     </div>
