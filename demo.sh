@@ -62,7 +62,7 @@ act_registry() {
 
 act_inspect() {
   act "2. Inspect: the effective setup, and who enforces each part" \
-      "Claude Code itself is pinned in flake.lock, and so is every tool the agent gets."
+      "Every tool the agent gets is pinned in flake.lock."
   say "nix run $FLAKE#agentctl -- inspect reviewer"
   agentctl inspect reviewer | sed '/^Managed settings/,$d'
   pause
@@ -123,7 +123,7 @@ act_developer() {
 
 act_log() {
   act "8. Audit trail" \
-      "Written by the launcher outside the sandbox: profile version, flake rev, pinned harness, every action."
+      "Written by the launcher outside the sandbox: profile version, flake rev, every action."
   say "agentctl logs --last"
   agentctl logs --last
   echo

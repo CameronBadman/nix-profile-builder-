@@ -20,16 +20,13 @@ nix run $G#agentctl -- diff $G/v1.0.0#reviewer $G/v1.1.0#reviewer --text   # age
 # ~/.config/agent-profiles/oauth-token  (or export CLAUDE_CODE_OAUTH_TOKEN)
 nix run $G#reviewer  -- --repo . "Review calc.py"
 nix run $G#reviewer  -- --redteam --repo . "echo hacked >> calc.py"   # guidance off, sandbox on
-nix run $G/v1.0.0#reviewer -- --repo . "Review calc.py"               # pinned older version
+nix run $G/v1.0.0#reviewer -- --repo . "Review calc.py"               # an older published version
 nix run $G#agentctl -- logs --last
 ```
 
-Claude Code itself (`claude-code` from nixpkgs, 2.1.293) is pinned in `flake.lock`, along with
-every tool in each profile's environment. The launcher needs Claude Code >= 2.1.259
-(`--restricted` arrived in 2.1.248, `--permission-prompts` in 2.1.259): the pinned version is
-checked at build time and the actual binary at launch, and an older one is refused with a clear
-error. Set `harness = "host"` in a profile to use the host
-binary instead (unpinned; version still logged).
+Every tool in each profile's environment is pinned in `flake.lock`. The launcher needs
+Claude Code >= 2.1.259 (`--restricted` arrived in 2.1.248, `--permission-prompts` in 2.1.259)
+and refuses an older binary with a clear error; the version used is logged on every run.
 
 ## Demo
 
@@ -116,14 +113,13 @@ From `enforcement` in `nix/mkAgent.nix` (also printed by `agentctl inspect`):
 | `network.tools = open` | NOT RESTRICTED (declared open) | agent tools |
 | model API egress | always allowed | required to run |
 | skills + behaviour standards | **GUIDANCE ONLY** (system prompt / skills plugin) | compliance not guaranteed |
-| harness binary version | **NOT PINNED** (host `claude`) | recorded per run |
+| harness binary version | recorded per run | - |
 | anything else (allowlists, extra writable paths, ...) | **unsupported -> eval error** | - |
 
 ## Security boundary & limitations
 
 - **Linux + bubblewrap only.** No macOS/Windows support.
-- **Host `claude` binary is not pinned.** It is bind-mounted read-only from the host; its
-  version is logged in every run's `run_start` record.
+- **Claude Code version** is recorded in every run's `run_start` record.
 - **Model API egress is always allowed**; the sandbox shares the host network namespace so the
   harness can reach the API. `network.tools` only governs the agent's tools.
 - **The agent can read its own OAuth token** (it is in its environment). Bash has no network,

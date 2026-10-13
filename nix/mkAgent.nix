@@ -64,9 +64,8 @@ let
       scope = "agent tools"; }
     { control = "model API egress"; by = "always allowed"; scope = "required for the agent to run"; }
     { control = "skills + behaviour standards"; by = "GUIDANCE ONLY (system prompt / skills)"; scope = "compliance not guaranteed"; }
-    (if p.harness == "nixpkgs"
-     then { control = "harness claude-code ${pkgs.claude-code.version}"; by = "pinned (flake.lock nixpkgs)"; scope = "recorded per run"; }
-     else { control = "harness binary version"; by = "NOT PINNED (host claude)"; scope = "recorded per run"; })
+  ] ++ lib.optionals (p.harness == "host") [
+    { control = "harness binary version"; by = "host claude (version recorded per run)"; scope = "recorded per run"; }
   ];
 
   policy = p // {

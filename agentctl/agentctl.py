@@ -107,10 +107,10 @@ def resolve_harness(policy):
         path = policy["harnessPath"]
         ver = subprocess.run([path, "--version"], capture_output=True, text=True).stdout.strip()
         check_harness_version(ver, path)
-        return None, f"{ver} [pinned nixpkgs]", path
+        return None, ver, path
     real, ver = host_claude()
     check_harness_version(ver, real)
-    return real, f"{ver} [host, unpinned]", CLAUDE_IN_SANDBOX
+    return real, ver, CLAUDE_IN_SANDBOX
 
 
 def host_claude():
@@ -133,7 +133,6 @@ def cmd_inspect(args):
     print(f"Profile      {p['profileId']}   (flake rev {p['rev']})")
     print(f"Bundle       {bundle}")
     print(f"Description  {p['description']}")
-    print(f"Harness      {p.get('harnessPath') or 'host claude (unpinned)'}")
     print(f"Workspace    {p['filesystem']['workspace']}   extra read-only: {p['filesystem']['extraReadOnly'] or '-'}")
     print(f"Network      tools={p['network']['tools']}")
     print(f"Tools        {', '.join(p['tools'])}")
@@ -421,7 +420,6 @@ def cmd_list(args):
 
 
 DIFF_FIELDS = [("version", lambda p: p["version"]),
-               ("harness", lambda p: p["harnessPath"].split("/")[-3].split("-", 1)[1] if p.get("harnessPath") else "host (unpinned)"),
                ("workspace", lambda p: p["filesystem"]["workspace"]),
                ("network.tools", lambda p: p["network"]["tools"]),
                ("tools", lambda p: p["tools"]),

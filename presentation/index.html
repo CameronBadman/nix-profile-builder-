@@ -103,7 +103,7 @@
 }</div>
     <div class="card">
       <h3>What you get</h3>
-      <p><span class="b">Tools</span> pinned by Nix, and <b>Claude Code itself</b> too (2.1.293).</p>
+      <p><span class="b">Tools</span> pinned by Nix: every agent gets exactly its toolbox.</p>
       <p><span class="r">Permissions</span> enforced by the kernel sandbox + harness.</p>
       <p><span class="v">Skills & standards</span> loaded as agent instructions.</p>
       <p><span class="g">Versions</span> = git tags. Distribution = GitHub. No server.</p>
@@ -115,7 +115,7 @@
 <section class="slide">
   <div class="kicker">How it works</div>
   <h2>A launch, end to end.</h2>
-  <svg viewBox="0 0 1200 430" role="img" aria-label="Architecture: GitHub flake builds a read-only Nix store bundle; agentctl launches pinned Claude Code inside a bubblewrap sandbox and writes the audit log from outside">
+  <svg viewBox="0 0 1200 430" role="img" aria-label="Architecture: GitHub flake builds a read-only Nix store bundle; agentctl launches Claude Code inside a bubblewrap sandbox and writes the audit log from outside">
     <defs>
       <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/></marker>
     </defs>
@@ -129,7 +129,7 @@
     <text x="40" y="268" font-size="20" font-weight="700" fill="#3fb950">/nix/store bundle</text>
     <text x="40" y="296" font-size="15" fill="#8b949e">managed-settings.json</text>
     <text x="40" y="318" font-size="15" fill="#8b949e">skills · behaviour.md</text>
-    <text x="40" y="340" font-size="15" fill="#8b949e">tool env · claude-code</text>
+    <text x="40" y="340" font-size="15" fill="#8b949e">pinned tool env</text>
     <text x="40" y="370" font-size="14" fill="#3fb950">read-only by construction</text>
     <line x1="145" y1="150" x2="145" y2="226" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
     <text x="155" y="195" font-size="14" fill="#8b949e">nix build</text>
@@ -138,7 +138,7 @@
     <text x="380" y="52" font-size="17" font-weight="700" fill="#f85149">bubblewrap sandbox (kernel)</text>
     <text x="380" y="76" font-size="14" fill="#8b949e">repo ro / rw · $HOME hidden · policy mounted read-only</text>
     <rect x="400" y="100" width="480" height="150" rx="12" fill="#161b22" stroke="#30363d"/>
-    <text x="420" y="136" font-size="19" font-weight="700">Claude Code 2.1.293 (pinned)</text>
+    <text x="420" y="136" font-size="19" font-weight="700">Claude Code</text>
     <text x="420" y="162" font-size="15" fill="#8b949e">--restricted · managed settings · --tools</text>
     <text x="420" y="186" font-size="15" fill="#8b949e">skills + standards as instructions</text>
     <rect x="420" y="200" width="200" height="36" rx="8" fill="#0d1117" stroke="#bc8cff"/>
@@ -167,7 +167,7 @@
   <div class="kicker">Three things to watch for</div>
   <h2>The demo in one slide.</h2>
   <div class="wow">
-    <div class="card"><div class="n">01</div><h3>An agent from a URL</h3><p class="dim">Nothing installed. Nix fetches tools, skills, policy and Claude Code from GitHub.</p></div>
+    <div class="card"><div class="n">01</div><h3>An agent from a URL</h3><p class="dim">Nothing installed. Nix fetches tools, skills and policy from GitHub.</p></div>
     <div class="card"><div class="n">02</div><h3>Upgrade = git tag</h3><p class="dim">Diff two published versions of an agent like a pull request.</p></div>
     <div class="card"><div class="n">03</div><h3>The kernel says no</h3><p class="dim">Tell the agent to break the rules. It tries. It can't.</p></div>
   </div>
@@ -185,7 +185,7 @@
                     <span class="dim">Read-only code reviewer applying ACME review standards</span>
 
 <span class="cmd">nix run github:CameronBadman/nix-profile-builder-#reviewer -- --repo . "Review calc.py"</span>
-<b>== reviewer@1.1.0  rev df7669500036  harness 2.1.293 (Claude Code) [pinned nixpkgs]</b>
+<b>== reviewer@1.1.0  rev df7669500036</b>
 [init] profile skills=<span class="g">['profile-reviewer:acme-code-review']</span>
 <b>[agent]</b> ACME-REVIEW:
   <span class="dim">… security-auditor subagent: calc.py:15 · CWE-369 (Divide by Zero) …</span>
@@ -200,7 +200,6 @@
 <span class="r">--- v1.0.0#reviewer  (reviewer@1.0.0, rev 60d9d928dadd)</span>
 <span class="g">+++ v1.1.0#reviewer  (reviewer@1.1.0, rev c1b3b5c934d0)</span>
   version           <span class="r">1.0.0</span> -&gt; <span class="g">1.1.0</span>
-  <span class="dim">harness           claude-code-2.1.293</span>
   packages          <span class="g">+shellcheck-0.11.0-bin</span> <span class="dim">git-2.55.0 ripgrep-15.2.0</span>
   <span class="dim">tools             Read, Grep, Glob, Bash, Skill, Agent</span>
 
@@ -271,7 +270,7 @@
   <p class="dim">Registry → inspect → upgrade → sandbox probe → reviewer → red team → developer → audit log.</p>
   <div class="cols">
     <div class="card"><h3>Built tonight</h3>
-      <p class="dim">Nix flake + validation · bubblewrap launcher · pinned Claude Code · skills as plugins · subagents · audit log · tag diffs · 12 no-cost tests</p></div>
+      <p class="dim">Nix flake + validation · bubblewrap launcher · skills as plugins · subagents · audit log · tag diffs · 12 no-cost tests</p></div>
     <div class="card"><h3>Next</h3>
       <p class="dim">Egress proxy for domain allowlists · signed profile releases · more harnesses (same schema) · macOS sandbox</p></div>
   </div>
