@@ -33,17 +33,27 @@
 
       packages = forAll (pkgs:
         let
-          agentctl = pkgs.writeScriptBin "agentctl"
+          agentctl-core = pkgs.writeScriptBin "agentctl"
             ("#!${pkgs.python3}/bin/python3\n" + builtins.readFile ./agentctl/agentctl.py);
           mkAgent = profile: import ./nix/mkAgent.nix {
-            inherit pkgs lib profile agentctl skillsDir standardsDir rev;
+            inherit pkgs lib profile skillsDir standardsDir rev;
+            agentctl = agentctl-core;
           };
+          bundles = lib.mapAttrs (_: mkAgent) profiles;
+          # agentctl with this flake's registry baked in, so
+          # `nix run github:org/repo#agentctl -- inspect reviewer` needs no checkout.
+          registry = pkgs.writeText "agent-registry.json"
+            (builtins.toJSON { inherit rev; profiles = lib.mapAttrs (_: b: "${b}") bundles; });
+          agentctl = pkgs.writeShellScriptBin "agentctl" ''
+            export AGENT_PROFILES_REGISTRY=${registry}
+            exec ${agentctl-core}/bin/agentctl "$@"
+          '';
         in
-        lib.mapAttrs (_: mkAgent) profiles // { inherit agentctl; default = agentctl; });
+        bundles // { inherit agentctl agentctl-core; default = agentctl; });
 
       apps = forAll (pkgs: lib.mapAttrs (n: drv: {
         type = "app";
-        program = if n == "agentctl" || n == "default"
+        program = if lib.elem n [ "agentctl" "agentctl-core" "default" ]
           then "${drv}/bin/agentctl" else "${drv}/bin/${n}";
       }) self.packages.${pkgs.stdenv.hostPlatform.system});
 

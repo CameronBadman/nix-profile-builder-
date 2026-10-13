@@ -17,7 +17,7 @@ from pathlib import Path
 
 STATE = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "agent-profiles"
 TOKEN_FILE = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "agent-profiles" / "oauth-token"
-DEFAULT_FLAKE = os.environ.get("AGENT_PROFILES_FLAKE", ".")
+DEFAULT_FLAKE = os.environ.get("AGENT_PROFILES_FLAKE")  # None -> baked registry, then "."
 SANDBOX_HOME = "/home/agent"
 CONFIG_DIR = f"{SANDBOX_HOME}/.claude-profile"
 SCRATCH = f"{SANDBOX_HOME}/scratch"
@@ -28,6 +28,16 @@ BLOCK_MARKERS = ("read-only file system", "permission denied", "not permitted",
                  "denied", "eacces", "erofs", "not allowed", "outside the allowed")
 
 
+COLOR = sys.stdout.isatty() or bool(os.environ.get("FORCE_COLOR"))
+
+
+def c(text, code):
+    return f"\033[{code}m{text}\033[0m" if COLOR else str(text)
+
+
+RED, GREEN, YELLOW, CYAN, BOLD, DIM = "1;31", "1;32", "1;33", "36", "1", "2"
+
+
 def die(msg):
     print(f"agentctl: error: {msg}", file=sys.stderr)
     sys.exit(2)
@@ -35,15 +45,33 @@ def die(msg):
 
 # ---------------------------------------------------------------- resolve
 
-def resolve_bundle(args):
-    if args.bundle:
-        return Path(args.bundle)
-    ref = f"{args.flake}#{args.profile}"
+def registry():
+    path = os.environ.get("AGENT_PROFILES_REGISTRY")
+    return json.loads(Path(path).read_text()) if path else {"rev": None, "profiles": {}}
+
+
+def build_ref(ref):
     r = subprocess.run(["nix", "build", "--no-link", "--print-out-paths", ref],
                        capture_output=True, text=True)
     if r.returncode != 0:
         die(f"could not build profile {ref}:\n{r.stderr.strip()}")
     return Path(r.stdout.strip().splitlines()[-1])
+
+
+def resolve_name(spec, flake=None):
+    """'reviewer' -> baked registry (or --flake); 'github:org/repo/v1.0.0#reviewer' -> nix build."""
+    if "#" in spec:
+        return build_ref(spec)
+    reg = registry()["profiles"]
+    if flake is None and spec in reg:
+        return Path(reg[spec])
+    return build_ref(f"{flake or '.'}#{spec}")
+
+
+def resolve_bundle(args):
+    if args.bundle:
+        return Path(args.bundle)
+    return resolve_name(args.profile, args.flake)
 
 
 def load_policy(bundle):
@@ -205,7 +233,7 @@ class Audit:
             self.say(f"[init] tools={m.get('tools')}")
             if "skills" in m:
                 mine = [s for s in m["skills"] if s.startswith("profile-")]
-                self.say(f"[init] profile skills={mine} (+{len(m['skills']) - len(mine)} built-in)")
+                self.say(f"[init] profile skills={c(mine, GREEN)} (+{len(m['skills']) - len(mine)} built-in)")
             if m.get("plugin_errors"):
                 self.say(f"[init] PLUGIN ERRORS {m['plugin_errors']}")
             if "agents" in m:
@@ -213,16 +241,16 @@ class Audit:
         elif t == "system" and m.get("subtype") == "permission_denied":
             self.counts["blocked"] += 1
             self.write("blocked", layer="harness", detail=m)
-            self.say(f"[BLOCKED by harness] {json.dumps(m)[:200]}")
+            self.say(f"[{c('BLOCKED by harness', RED)}] {m.get('tool_name')}: {m.get('decision_reason', '')[:160]}")
         elif t == "assistant":
             for b in m.get("message", {}).get("content", []):
                 if b.get("type") == "tool_use":
                     self.pending[b["id"]] = b
                     self.write("tool_request", tool=b["name"], input=b.get("input"),
                                subagent=m.get("parent_tool_use_id"))
-                    self.say(f"[tool] {b['name']} {json.dumps(b.get('input'))[:160]}")
+                    self.say(c(f"[tool] {b['name']} {json.dumps(b.get('input'))[:160]}", CYAN))
                 elif b.get("type") == "text" and b.get("text", "").strip():
-                    self.say(f"[agent] {b['text'].strip()}")
+                    self.say(f"{c('[agent]', BOLD)} {b['text'].strip()}")
         elif t == "user":
             content = m.get("message", {}).get("content", [])
             for b in content if isinstance(content, list) else []:
@@ -239,7 +267,8 @@ class Audit:
                     kind = "blocked" if any(k in text.lower() for k in RESULT_BLOCK_MARKERS) else "allowed"
                 self.counts[kind] += 1
                 self.write(kind, tool=req.get("name"), input=req.get("input"), result=text[:500])
-                label = {"allowed": "ALLOWED", "blocked": "BLOCKED", "error": "error"}[kind]
+                label = {"allowed": c("ALLOWED", GREEN), "blocked": c("BLOCKED", RED),
+                         "error": c("error", YELLOW)}[kind]
                 self.say(f"[{label}] {req.get('name')}: {text.strip()[:200]}")
         elif t == "result":
             self.write("result", permission_denials=m.get("permission_denials"),
@@ -286,9 +315,9 @@ def cmd_launch(args):
                         workspace_mode=policy["filesystem"]["workspace"], model=args.model,
                         redteam=args.redteam,
                         prompt=args.prompt)
-    print(f"== {policy['profileId']}  rev {policy['rev'][:12]}  harness {claude_ver}")
+    print(c(f"== {policy['profileId']}  rev {policy['rev'][:12]}  harness {claude_ver}", BOLD))
     if args.redteam:
-        print("== REDTEAM: behaviour guidance + skills dropped; enforcement unchanged")
+        print(c("== REDTEAM: behaviour guidance + skills dropped; enforcement unchanged", YELLOW))
     print(f"== workspace {repo} ({policy['filesystem']['workspace']})  log {audit.path}")
     proc = subprocess.Popen(argv + ["--"] + claude, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     for line in proc.stdout:
@@ -306,8 +335,8 @@ def cmd_launch(args):
         audit.write("stderr", text=err[-2000:])
         print(f"[stderr] {err[-800:]}", file=sys.stderr)
     audit.write("run_end", exit_code=rc, **audit.counts)
-    print(f"== done: exit={rc} allowed={audit.counts['allowed']} blocked={audit.counts['blocked']} "
-          f"errors={audit.counts['error']}  profile={start['profile']}")
+    print(c(f"== done: exit={rc} ", BOLD) + c(f"allowed={audit.counts['allowed']} ", GREEN)
+          + c(f"blocked={audit.counts['blocked']} ", RED) + f"errors={audit.counts['error']}  profile={start['profile']}")
     return rc
 
 
@@ -349,10 +378,69 @@ def cmd_probe(args):
             good = ok == expect_ok
             failures += not good
             detail = (r.stderr or r.stdout).strip().splitlines()
-            print(f"  {'PASS' if good else 'FAIL'}  {name:<42} -> {'succeeded' if ok else 'denied'}"
+            print(f"  {c('PASS', GREEN) if good else c('FAIL', RED)}  {name:<42} -> {'succeeded' if ok else 'denied'}"
                   f"{'  (' + detail[-1][-70:] + ')' if detail and not ok else ''}")
         print(f"{'OK' if not failures else 'FAILED'}: {len(checks) - failures}/{len(checks)} checks match policy")
         return 1 if failures else 0
+
+
+# ---------------------------------------------------------------- list / diff
+
+def cmd_list(args):
+    reg = registry()
+    if not reg["profiles"]:
+        die("no baked registry (run via `nix run <flake>#agentctl`)")
+    print(c(f"Profile registry (flake rev {(reg['rev'] or '?')[:12]})", BOLD))
+    for name, path in sorted(reg["profiles"].items()):
+        p = json.loads((Path(path) / "policy.json").read_text())
+        print(f"  {c(p['profileId'], GREEN):<30} {p['filesystem']['workspace']:<10} "
+              f"tools={','.join(p['tools'])}  skills={','.join(p['skills'])}")
+        print(f"  {'':<19}{c(p['description'], DIM)}")
+
+
+DIFF_FIELDS = [("version", lambda p: p["version"]),
+               ("harness", lambda p: p["harnessPath"].split("/")[-3].split("-", 1)[1] if p.get("harnessPath") else "host (unpinned)"),
+               ("workspace", lambda p: p["filesystem"]["workspace"]),
+               ("network.tools", lambda p: p["network"]["tools"]),
+               ("tools", lambda p: p["tools"]),
+               ("packages", lambda p: [Path(v).name.split("-", 1)[1] for v in p["packagePaths"].values()]),
+               ("skills", lambda p: p["skills"]),
+               ("standards", lambda p: p["behaviour"]["standards"]),
+               ("subagents", lambda p: sorted(p["subagents"])),
+               ("permissions.deny", lambda p: p["managedSettings"]["permissions"]["deny"]),
+               ("bash sandbox", lambda p: p["bashSandbox"])]
+
+
+def cmd_diff(args):
+    import difflib
+    a, b = resolve_name(args.a), resolve_name(args.b)
+    pa, pb = (json.loads((x / "policy.json").read_text()) for x in (a, b))
+    print(c(f"--- {args.a}  ({pa['profileId']}, rev {pa['rev'][:12]})", RED))
+    print(c(f"+++ {args.b}  ({pb['profileId']}, rev {pb['rev'][:12]})", GREEN))
+    for field, get in DIFF_FIELDS:
+        va, vb = get(pa), get(pb)
+        if va == vb:
+            print(c(f"  {field:<17} {va}", DIM))
+        elif isinstance(va, list) and isinstance(vb, list):
+            gone = [x for x in va if x not in vb]
+            new = [x for x in vb if x not in va]
+            same = [x for x in va if x in vb]
+            print(f"  {field:<17} " + " ".join([c(f"-{x}", RED) for x in gone] + [c(f"+{x}", GREEN) for x in new]
+                                               + [c(x, DIM) for x in same]))
+        else:
+            print(f"  {field:<17} {c(va, RED)} -> {c(vb, GREEN)}")
+    texts = [("behaviour.md", "behaviour.md")] + [
+        (f"skills/{s}/SKILL.md", f"skills/{s}/SKILL.md") for s in sorted(set(pa["skills"]) | set(pb["skills"]))]
+    for label, rel in texts:
+        ta = (a / rel).read_text().splitlines() if (a / rel).exists() else []
+        tb = (b / rel).read_text().splitlines() if (b / rel).exists() else []
+        d = list(difflib.unified_diff(ta, tb, f"a/{label}", f"b/{label}", lineterm="", n=1))
+        if d and args.text:
+            print()
+            for line in d:
+                print(c(line, GREEN) if line.startswith("+") else c(line, RED) if line.startswith("-") else line)
+        elif d:
+            print(c(f"  {label}: changed ({sum(l.startswith(('+', '-')) for l in d) - 2} lines; --text to show)", YELLOW))
 
 
 # ---------------------------------------------------------------- logs
@@ -405,6 +493,15 @@ def main():
     common(sp, needs_repo=True)
     sp.set_defaults(fn=cmd_probe)
 
+    sp = sub.add_parser("list", help="list profiles in the baked registry")
+    sp.set_defaults(fn=cmd_list)
+
+    sp = sub.add_parser("diff", help="compare two profiles (name or flakeref#name)")
+    sp.add_argument("a")
+    sp.add_argument("b")
+    sp.add_argument("--text", action="store_true", help="show behaviour/skill text diffs")
+    sp.set_defaults(fn=cmd_diff)
+
     sp = sub.add_parser("logs", help="list audit logs or show the last one")
     sp.add_argument("--last", action="store_true")
     sp.set_defaults(fn=cmd_logs)
@@ -419,7 +516,7 @@ def main():
         if not words:
             die("launch needs a prompt")
         args.prompt = " ".join(words)
-    if getattr(args, "profile", None) is None and not getattr(args, "bundle", None) and args.cmd != "logs":
+    if getattr(args, "profile", None) is None and not getattr(args, "bundle", None) and args.cmd in ("inspect", "probe"):
         die("give a profile name or --bundle")
     sys.exit(args.fn(args) or 0)
 
