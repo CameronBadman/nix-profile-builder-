@@ -230,7 +230,8 @@ def summarize(inp):
     """Short human label for a tool input: file name or the command."""
     inp = inp or {}
     if "command" in inp:
-        return STORE_PATH.sub("", inp["command"])[:70]
+        cmd = STORE_PATH.sub("", inp["command"]).split(" 2>&1")[0].split("; echo")[0]
+        return cmd if len(cmd) <= 60 else cmd[:60].rsplit(" ", 1)[0] + " …"
     for k in ("file_path", "path", "pattern", "skill"):
         if k in inp:
             return os.path.basename(str(inp[k])) if k == "file_path" else str(inp[k])[:60]
@@ -238,7 +239,8 @@ def summarize(inp):
 
 
 class Audit:
-    def __init__(self, policy, run_id):
+    def __init__(self, policy, run_id, redteam=False):
+        self.redteam = redteam
         (STATE / "logs").mkdir(parents=True, exist_ok=True)
         self.path = STATE / "logs" / f"{run_id}-{policy['name']}.jsonl"
         self.f = self.path.open("a")
@@ -270,7 +272,11 @@ class Audit:
                 self.say(f"[init] tools={m.get('tools')}")
             if "skills" in m:
                 mine = [s for s in m["skills"] if s.startswith("profile-")]
-                self.say(f"[init] profile skills={c(mine, GREEN)} (+{len(m['skills']) - len(mine)} built-in)")
+                if COMPACT:
+                    names = [x.split(":", 1)[-1] for x in mine]
+                    self.say(f"skills: {c(', '.join(names) or 'none (instructions deleted)', GREEN)}")
+                else:
+                    self.say(f"[init] profile skills={c(mine, GREEN)} (+{len(m['skills']) - len(mine)} built-in)")
             if m.get("plugin_errors"):
                 self.say(f"[init] PLUGIN ERRORS {m['plugin_errors']}")
             if "agents" in m and not COMPACT:
@@ -288,7 +294,12 @@ class Audit:
                     if not COMPACT:
                         self.say(c(f"[tool] {b['name']} {json.dumps(b.get('input'))[:160]}", CYAN))
                 elif b.get("type") == "text" and b.get("text", "").strip():
-                    self.say(f"{c('[agent]', BOLD)} {b['text'].strip()}")
+                    text = b["text"].strip()
+                    if COMPACT:
+                        if self.redteam:
+                            continue
+                        text = re.split(r"(?<=[.!?])\s", text.replace("\n", " "), maxsplit=1)[0]
+                    self.say(f"{c('[agent]', BOLD)} {text}")
         elif t == "user":
             content = m.get("message", {}).get("content", [])
             for b in content if isinstance(content, list) else []:
@@ -299,7 +310,11 @@ class Audit:
                 if isinstance(text, list):
                     text = " ".join(x.get("text", "") for x in text if isinstance(x, dict))
                 text = str(text or "")
-                if b.get("is_error"):
+                cmd = json.dumps(req.get("input") or {})
+                if b.get("is_error") and str(Path.home()) in cmd and "no such file" in text.lower():
+                    kind = "blocked"  # the host home folder is not mounted in the sandbox at all
+                    text += "\n: hidden from the sandbox"
+                elif b.get("is_error"):
                     kind = "blocked" if any(k in text.lower() for k in BLOCK_MARKERS) else "error"
                 else:
                     kind = "blocked" if any(k in text.lower() for k in RESULT_BLOCK_MARKERS) else "allowed"
@@ -307,7 +322,9 @@ class Audit:
                 self.write(kind, tool=req.get("name"), input=req.get("input"), result=text[:500])
                 label = {"allowed": c("ALLOWED", GREEN), "blocked": c("BLOCKED", RED),
                          "error": c("error", YELLOW)}[kind]
-                if COMPACT:
+                if COMPACT and kind == "allowed" and req.get("name") in ("Read", "Grep", "Glob", "Skill", "TodoWrite"):
+                    pass  # read-only noise; still counted and logged
+                elif COMPACT:
                     lines = [l for l in text.strip().splitlines() if l.strip()] or [""]
                     hit = [l for l in lines if any(k in l.lower() for k in BLOCK_MARKERS)]
                     detail = (hit or lines)[-1].rsplit(": ", 1)[-1]  # "...: Read-only file system" -> reason
@@ -341,7 +358,7 @@ def cmd_launch(args):
     claude_real, claude_ver, claude_cmd = resolve_harness(policy)
     run_id = dt.datetime.now().strftime("%Y%m%dT%H%M%S") + "-" + uuid.uuid4().hex[:6]
     config_dir = new_config_dir(run_id)
-    audit = Audit(policy, run_id)
+    audit = Audit(policy, run_id, redteam=args.redteam)
 
     claude = [claude_cmd, "--restricted", "-p", "--output-format", "stream-json", "--verbose",
               "--tools", ",".join(policy["tools"]),

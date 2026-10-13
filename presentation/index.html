@@ -30,11 +30,13 @@
   .dim { color: var(--dim); }
   .g { color: var(--green); } .r { color: var(--red); } .y { color: var(--yellow); } .b { color: var(--blue); } .v { color: var(--violet); }
   .brand { font: 800 clamp(22px, 2.8vw, 40px) var(--mono); color: var(--green); letter-spacing: -.02em; }
-  .stakes { font-size: clamp(22px, 3vw, 44px); font-weight: 700; line-height: 1.25; max-width: 30ch; }
+  .incident { font-size: clamp(17px, 2vw, 28px); color: var(--fg); border-left: 4px solid var(--red); padding-left: 1vw; max-width: 52ch; }
+  .stakes { font-size: clamp(22px, 3vw, 44px); font-weight: 700; line-height: 1.25; max-width: 34ch; }
   .term {
     background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 2.4vh 2vw;
     font: clamp(13px, 1.6vw, 23px)/1.6 var(--mono); white-space: pre; overflow-x: auto; max-width: 100%;
   }
+  .term.code { font-size: clamp(12px, 1.45vw, 21px); }
   .term .cmd { color: var(--yellow); }
   .term .cmd::before { content: "$ "; color: var(--faint); }
   .term .mute { color: var(--faint); }
@@ -50,6 +52,7 @@
   .stat .num { font: 800 clamp(34px, 5vw, 76px) var(--sans); letter-spacing: -.03em; line-height: 1.05; }
   .stat .lbl { font-size: clamp(15px, 1.7vw, 24px); color: var(--dim); }
   .qr { width: clamp(120px, 15vw, 230px); aspect-ratio: 1; background: #fff; border-radius: 14px; padding: 10px; }
+  .ask { font-size: clamp(20px, 2.5vw, 36px); color: var(--yellow); font-weight: 700; }
   .try { font: 700 clamp(13px, 1.5vw, 22px) var(--mono); background: var(--panel); border: 1px solid var(--line);
     border-radius: 12px; padding: 1.6vh 1.4vw; overflow-x: auto; white-space: nowrap; }
   .try .h { color: var(--green); }
@@ -74,8 +77,8 @@
 <section class="slide" data-tag="">
   <div class="brand">agentflake</div>
   <h1>AI agents,<br>versioned like code.</h1>
-  <p class="stakes">Today your AI agent has a shell, your repo and your login. <span class="r">The only thing stopping it is a prompt that says "please don't".</span></p>
-  <p class="small dim">July 2025: an AI coding agent deleted a company's production database during a code freeze. (Replit / SaaStr)</p>
+  <p class="stakes">Today your AI agent has a shell, your repo and your login. <span class="r">What stops it? A prompt that says "please don't", and a settings file on each laptop that anyone can change.</span></p>
+  <p class="incident">July 2025: an AI coding agent deleted a company's production database during a code freeze. <span class="dim">(Replit / SaaStr)</span></p>
   <p class="small dim">For platform teams rolling AI agents out to every developer.</p>
 </section>
 
@@ -83,17 +86,17 @@
   <div class="kicker">The idea</div>
   <h2>One file defines the agent. Git versions it.</h2>
   <div class="cols">
-    <div class="term"><span class="mute"># profiles/reviewer.nix (abridged)</span>
-name                 = <span class="g">"reviewer"</span>;
-version              = <span class="g">"1.1.0"</span>;
-packages             = [ <span class="g">"git" "ripgrep" "shellcheck"</span> ];
+    <div class="term code"><span class="mute"># profiles/reviewer.nix (abridged)</span>
+name = <span class="g">"reviewer"</span>;
+version = <span class="g">"1.1.0"</span>;
+packages = [ <span class="g">"git" "ripgrep" "shellcheck"</span> ];
 filesystem.workspace = <span class="g">"read-only"</span>;
-network.tools        = <span class="g">"deny"</span>;  <span class="mute"># web tools off</span>
-skills               = [ <span class="g">"acme-code-review"</span> ];
-behaviour.standards  = [ <span class="g">"review"</span> ];</div>
+network.tools = <span class="g">"deny"</span>;   <span class="mute"># web tools off</span>
+skills = [ <span class="g">"acme-code-review"</span> ];
+behaviour.standards = [ <span class="g">"review"</span> ];</div>
     <div class="stack">
       <p><b class="r">Locked by the OS:</b> <span class="dim">repo, home folder and its own rules</span></p>
-      <p><b class="v">Company skills</b> <span class="dim">and standards built in</span></p>
+      <p><b class="v">Company skills &amp; standards</b> <span class="dim">included</span></p>
       <p><b class="g">Versioned by git:</b> <span class="dim">every release is a tag you can diff</span></p>
     </div>
   </div>
@@ -107,11 +110,11 @@ behaviour.standards  = [ <span class="g">"review"</span> ];</div>
   <div class="close">
     <div class="stack">
       <div class="stats">
-        <div class="stat"><div class="num g">24 / 24</div><div class="lbl">rule-breaking actions blocked<br>(10 red-team runs)</div></div>
+        <div class="stat"><div class="num g">0</div><div class="lbl">writes got through<br>(24 blocked actions, 10 red-team runs)</div></div>
         <div class="stat"><div class="num">&lt; 1¢</div><div class="lbl">per agent run (Claude Haiku)</div></div>
       </div>
       <div class="try"><span class="dim">try it → </span>nix run <span class="h">github:CameronBadman/nix-profile-builder-#agentctl</span> -- list</div>
-      <p class="small"><b>Ask:</b> <span class="dim">try it on your repo, and tell us which agent tool to support next.</span></p>
+      <p class="ask"><b>Ask:</b> platform teams, pilot it on one repo this week.</p>
       <p class="small dim">~900 lines · built in one evening</p>
     </div>
     <div class="qr"><svg role="img" aria-label="QR code: github.com/CameronBadman/nix-profile-builder-" width="100%" height="100%" viewBox="0 0 31 31" preserveAspectRatio="none" version="1.1" xmlns="http://www.w3.org/2000/svg">
@@ -657,7 +660,10 @@ behaviour.standards  = [ <span class="g">"review"</span> ];</div>
   // Arrows / PageUp / PageDown only: Enter and Space are left alone so a stray keypress
   // meant for the terminal demo can't skip slides. "b" jumps to the backups.
   document.addEventListener('keydown', e => {
-    if (['ArrowRight', 'PageDown'].includes(e.key)) { e.preventDefault(); show(i + 1); }
+    if (['ArrowRight', 'PageDown'].includes(e.key)) {
+      e.preventDefault();
+      if (i !== mainCount - 1) show(i + 1);  // the close never walks into the backups; use "b"
+    }
     if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); show(i - 1); }
     if (e.key === 'Home') show(0);
     if (e.key === 'b') show(mainCount);
