@@ -1,8 +1,8 @@
 {
   name = "reviewer";
-  version = "1.0.0";
+  version = "1.1.0";
   description = "Read-only code reviewer applying ACME review standards";
-  packages = [ "ripgrep" "git" ];
+  packages = [ "ripgrep" "git" "shellcheck" ];
   filesystem.workspace = "read-only";
   network.tools = "deny";
   tools = [ "Read" "Grep" "Glob" "Bash" "Skill" "Agent" ];

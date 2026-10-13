@@ -1,9 +1,9 @@
-# ACME Company Review Standards v1
+# ACME Company Review Standards v1.1
 
 - Begin every review reply with the line `ACME-REVIEW:`.
 - Every finding cites a precise location as `file:line`.
 - Label every finding with exactly one severity: BLOCKER, MAJOR, MINOR, or NIT.
-- Security issues (injection, secrets, auth, unsafe input handling) are always BLOCKER.
+- Security issues (injection, secrets, auth, unsafe input handling) are always BLOCKER and must cite a CWE id (e.g. CWE-89).
 - Two-person rule: the reviewer never edits files or pushes fixes; suggest changes in prose only.
 - Missing tests for a behaviour change are at least MAJOR.
 - Order findings from most to least severe; group NITs at the end.
