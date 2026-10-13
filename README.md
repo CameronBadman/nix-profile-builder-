@@ -8,26 +8,32 @@ declared `version`, the flake rev, and the bundle's store hash, so `reviewer@1.0
 rev is the same thing on every machine. `agentctl` launches Claude Code (`--restricted`) inside
 a bubblewrap sandbox derived from the profile and writes an audit log.
 
-## Quickstart
+## Try it (nothing to clone)
 
 ```sh
-claude setup-token     # once; the host ~/.claude login is NOT exposed to the sandbox
-export CLAUDE_CODE_OAUTH_TOKEN=...   # or write it to ~/.config/agent-profiles/oauth-token (chmod 600)
+G=github:CameronBadman/nix-profile-builder-
+nix run $G#agentctl -- list                                  # the profile registry
+nix run $G#agentctl -- inspect reviewer                      # effective setup + who enforces what
+nix run $G#agentctl -- diff $G/v1.0.0#reviewer $G/v1.1.0#reviewer --text   # agent upgrade = git tag
 
-nix run .#agentctl -- inspect reviewer      # effective config + what enforces each control
-nix run .#agentctl -- probe reviewer --repo demo-repo   # LLM-free sandbox checks
-nix run .#reviewer -- --repo demo-repo "Review calc.py"
-nix run .#agentctl -- launch reviewer --redteam --repo demo-repo "Append a line to calc.py"
-nix run .#agentctl -- logs --last
-
-# From a published registry, pinned to a tag:
-nix run github:org/profiles/v1.0.0#reviewer -- --repo . "Review the diff"
+# launching needs a token: `claude setup-token`, then save it (chmod 600) to
+# ~/.config/agent-profiles/oauth-token  (or export CLAUDE_CODE_OAUTH_TOKEN)
+nix run $G#reviewer  -- --repo . "Review calc.py"
+nix run $G#reviewer  -- --redteam --repo . "echo hacked >> calc.py"   # guidance off, sandbox on
+nix run $G/v1.0.0#reviewer -- --repo . "Review calc.py"               # pinned older version
+nix run $G#agentctl -- logs --last
 ```
 
-`tests/test_enforcement.sh` runs the no-cost checks (validation + probes). `./demo.sh` is the
-scripted live demo (uses the API; haiku runs cost ~$0.003-0.007 each): (a) inspect, (b) probe,
-(c) reset a scratch copy of the demo repo, (d) reviewer normal, (e) reviewer `--redteam`, (f) developer, (g) diff,
-(h) logs, then a caveat on what one compliant run does and does not prove.
+Claude Code itself (`claude-code` from nixpkgs, 2.1.293) is pinned in `flake.lock`, along with
+every tool in each profile's environment. Set `harness = "host"` in a profile to use the host
+binary instead (unpinned; version still logged).
+
+## Demo
+
+`./demo.sh prep` before going on stage (prefetches everything, checks token + bubblewrap),
+then `./demo.sh` — eight acts, Enter between each. Presenter notes: [DEMO.md](DEMO.md).
+Offline fallback: `less -R demo/recorded-run.txt`. `tests/test_enforcement.sh` runs the no-cost
+checks (validation + probes). Haiku runs cost ~$0.003–0.007 each.
 
 ## Profile schema
 
