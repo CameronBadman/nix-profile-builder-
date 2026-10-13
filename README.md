@@ -166,3 +166,4 @@ demo-repo/                 toy Python repo used by demo and tests
 ```
 
 Audit logs: `${XDG_STATE_HOME:-~/.local/state}/agent-profiles/logs/<run>-<profile>.jsonl`.
+# nix-profile-builder-

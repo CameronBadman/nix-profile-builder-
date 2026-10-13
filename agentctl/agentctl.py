@@ -56,6 +56,17 @@ def load_policy(bundle):
     return policy
 
 
+def resolve_harness(policy):
+    """Pinned nixpkgs claude-code (lives in /nix/store, already visible read-only in the
+    sandbox) or the host binary (bind-mounted read-only)."""
+    if policy.get("harnessPath"):
+        path = policy["harnessPath"]
+        ver = subprocess.run([path, "--version"], capture_output=True, text=True).stdout.strip()
+        return None, f"{ver} [pinned nixpkgs]", path
+    real, ver = host_claude()
+    return real, f"{ver} [host, unpinned]", CLAUDE_IN_SANDBOX
+
+
 def host_claude():
     path = shutil.which("claude")
     if not path:
@@ -76,6 +87,7 @@ def cmd_inspect(args):
     print(f"Profile      {p['profileId']}   (flake rev {p['rev']})")
     print(f"Bundle       {bundle}")
     print(f"Description  {p['description']}")
+    print(f"Harness      {p.get('harnessPath') or 'host claude (unpinned)'}")
     print(f"Workspace    {p['filesystem']['workspace']}   extra read-only: {p['filesystem']['extraReadOnly'] or '-'}")
     print(f"Network      tools={p['network']['tools']}")
     print(f"Tools        {', '.join(p['tools'])}")
@@ -251,12 +263,12 @@ def cmd_launch(args):
         die(f"no OAuth token: export CLAUDE_CODE_OAUTH_TOKEN or write it to {TOKEN_FILE} "
             "(get one with `claude setup-token`); the host ~/.claude login is deliberately "
             "not exposed to the sandbox")
-    claude_real, claude_ver = host_claude()
+    claude_real, claude_ver, claude_cmd = resolve_harness(policy)
     run_id = dt.datetime.now().strftime("%Y%m%dT%H%M%S") + "-" + uuid.uuid4().hex[:6]
     config_dir = new_config_dir(run_id)
     audit = Audit(policy, run_id)
 
-    claude = [CLAUDE_IN_SANDBOX, "--restricted", "-p", "--output-format", "stream-json", "--verbose",
+    claude = [claude_cmd, "--restricted", "-p", "--output-format", "stream-json", "--verbose",
               "--tools", ",".join(policy["tools"]),
               "--permission-mode", "dontAsk", "--permission-prompts", "none",
               *guidance_flags(args, bundle),
@@ -307,7 +319,8 @@ def cmd_probe(args):
     policy = load_policy(bundle)
     repo = Path(args.repo).resolve()
     rw = policy["filesystem"]["workspace"] == "read-write"
-    claude_real = shutil.which("claude") and os.path.realpath(shutil.which("claude"))
+    claude_real = None if policy.get("harnessPath") else (
+        shutil.which("claude") and os.path.realpath(shutil.which("claude")))
     with tempfile.TemporaryDirectory() as tmp:
         cfg = Path(tmp) / "config"
         cfg.mkdir(parents=True)

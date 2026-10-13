@@ -7,7 +7,11 @@
     let
       lib = nixpkgs.lib;
       systems = [ "x86_64-linux" "aarch64-linux" ];
-      forAll = f: lib.genAttrs systems (s: f nixpkgs.legacyPackages.${s});
+      # Only claude-code is allowed through the unfree gate (it is the pinned harness).
+      forAll = f: lib.genAttrs systems (s: f (import nixpkgs {
+        system = s;
+        config.allowUnfreePredicate = p: lib.getName p == "claude-code";
+      }));
 
       skillsDir = ./skills;
       standardsDir = ./standards;

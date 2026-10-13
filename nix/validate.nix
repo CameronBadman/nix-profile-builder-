@@ -18,7 +18,7 @@ in
 p:
 let
   name = p.name or (throw "profile: missing 'name'");
-  known = [ "name" "version" "description" "packages" "filesystem" "network" "tools" "skills" "behaviour" "subagents" ];
+  known = [ "name" "version" "description" "harness" "packages" "filesystem" "network" "tools" "skills" "behaviour" "subagents" ];
   unknownKeys = lib.subtractLists known (builtins.attrNames p);
 
   fs = { workspace = "read-only"; extraReadOnly = [ ]; } // (p.filesystem or { });
@@ -29,6 +29,8 @@ let
 in
 assert unknownKeys == [ ] || fail name "unknown field(s) ${builtins.toJSON unknownKeys} (refusing to ignore them)";
 assert lib.isString (p.version or null) || fail name "missing string 'version'";
+assert lib.elem (p.harness or "nixpkgs") [ "nixpkgs" "host" ]
+  || fail name "harness must be \"nixpkgs\" (pinned claude-code) or \"host\"";
 assert lib.elem fs.workspace [ "read-only" "read-write" ]
   || fail name "filesystem.workspace must be \"read-only\" or \"read-write\"";
 assert lib.subtractLists [ "workspace" "extraReadOnly" ] (builtins.attrNames fs) == [ ]
@@ -63,6 +65,7 @@ in
   inherit name;
   inherit (p) version;
   description = p.description or "";
+  harness = p.harness or "nixpkgs";
   packages = p.packages or [ ];
   filesystem = fs;
   network = net;
